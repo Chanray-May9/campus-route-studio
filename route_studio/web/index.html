@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#0d746b">
+  <title>校园路线工作台 · Campus Route Studio</title>
+  <link rel="stylesheet" href="/vendor/leaflet.css">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/vendor/leaflet.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="校园路线工作台首页">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 28 28"><path d="M6 21V9a3 3 0 0 1 6 0v10a3 3 0 0 0 6 0V7"/><circle cx="6" cy="22" r="2"/><circle cx="18" cy="6" r="2"/></svg></span>
+        <span><strong>校园路线工作台</strong><small>CAMPUS ROUTE STUDIO</small></span>
+      </a>
+      <div class="header-actions"><span class="local-badge"><i></i>本机工作空间</span><button class="icon-button" id="help-button" aria-label="查看使用说明" title="使用说明">?</button></div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel editor-panel" aria-labelledby="route-title">
+        <div class="panel-heading"><div><span class="eyebrow">01 / PLAN</span><h1 id="route-title">规划一条路线</h1></div><span class="step-symbol" aria-hidden="true">↗</span></div>
+        <p class="panel-description">在地图上点选途经点，拖动标记微调。也可以直接输入坐标。</p>
+        <div class="route-summary"><div><span id="route-distance">0</span><small id="route-distance-unit">米</small><p>单圈路线</p></div><div><span id="route-point-count">0</span><small>个</small><p>途经点</p></div></div>
+        <div class="section-label"><h2>途经点</h2><button class="text-button" id="demo-button">载入示例</button></div>
+        <ol class="waypoints" id="waypoints" aria-label="路线途经点"><li class="empty-state">从第一个点开始<br><span>点击地图，或在下方添加坐标</span></li></ol>
+        <form class="coordinate-form" id="coordinate-form">
+          <div class="coordinate-inputs"><label>纬度<input id="latitude" type="number" min="-85" max="85" step="any" placeholder="30.2741" inputmode="decimal" required></label><label>经度<input id="longitude" type="number" min="-180" max="180" step="any" placeholder="120.1551" inputmode="decimal" required></label><button class="add-button" type="submit" aria-label="添加坐标点">+</button></div>
+        </form>
+        <div class="route-tools"><button class="subtle-button" id="undo-button">撤销</button><button class="subtle-button" id="close-loop-button">闭合路线</button><button class="subtle-button danger-text" id="clear-button">清空</button></div>
+        <div class="section-divider"></div>
+        <div class="section-label"><h2>回放参数</h2></div>
+        <label class="library-label">循环方式<select id="loop-mode"><option value="finite">指定圈数</option><option value="infinite">无限循环（手动停止）</option></select></label>
+        <div class="form-grid"><label>速度 <span class="unit-label">m/s</span><input id="speed" type="number" min="0.2" max="20" step="0.1" value="2.5"></label><label>指定圈数<input id="loops" type="number" min="1" max="10000" step="1" value="1"></label></div>
+        <p class="field-hint" id="loop-hint">回放指定圈数后自动停止。</p>
+        <div class="pace-row"><span>参考配速 <strong id="pace">6′40″ / 公里</strong></span><span>预计 <strong id="estimated-duration">—</strong></span></div>
+        <div class="motion-controls">
+          <label>速度变化<select id="motion-mode"><option value="fixed">固定速度</option><option value="smooth">逐渐加速 / 减速</option><option value="alternating">突然快 / 突然慢</option></select></label>
+          <div class="form-grid"><label>最低速度 m/s<input id="motion-low" type="number" min="0.2" max="20" step="0.1" value="2"></label><label>最高速度 m/s<input id="motion-high" type="number" min="0.2" max="20" step="0.1" value="3"></label></div>
+          <label>快慢完整周期（秒）<input id="motion-period" type="number" min="2" max="120" value="10"></label>
+          <div class="form-grid"><label>左右摆幅（米）<input id="motion-sway" type="number" min="0" max="3" step="0.1" value="0"></label><label>摆动周期（秒）<input id="motion-sway-period" type="number" min="2" max="30" value="4"></label></div>
+          <label>实时基础速度 m/s<input id="live-speed" type="number" min="0.2" max="20" step="0.1" value="2.5"></label>
+          <button id="apply-motion" class="secondary-button full-width" type="button">应用到当前回放</button>
+          <p class="field-hint">非固定模式使用最低 / 最高速度；左右摆动为轨迹偏移，0 表示关闭，不是手机传感器数据。</p>
+          <p class="field-hint" id="live-speed-status">当前速度：—</p>
+        </div>
+        <div class="section-divider"></div>
+        <div class="section-label"><h2>路线文件</h2><span class="tiny-muted">WGS84 坐标</span></div>
+        <div class="file-tools"><button class="secondary-button" id="import-button">导入路线</button><div class="export-combo"><select id="export-format" aria-label="导出文件格式"><option value="gpx">GPX</option><option value="geojson">GeoJSON</option></select><button id="export-button" class="secondary-button">导出</button></div></div>
+        <input id="import-file" type="file" accept=".gpx,.geojson,.json,application/gpx+xml,application/geo+json,application/json" hidden>
+        <div class="save-tools"><button class="text-button" id="save-button">保存到本机</button><button class="text-button" id="load-button">读取上次方案</button></div>
+        <div class="section-divider"></div>
+        <div class="section-label"><h2>我的轨迹库</h2><button id="library-refresh" class="text-button" type="button">刷新</button></div>
+        <label class="library-label">轨迹名称<input id="library-name" maxlength="80" placeholder="例如：学校操场三圈"></label>
+        <button id="library-save" class="secondary-button full-width" type="button">保存为新轨迹</button>
+        <select id="library-select" aria-label="已保存轨迹"><option value="">请选择已保存轨迹</option></select>
+        <p id="library-info" class="field-hint" role="status">轨迹与运动参数保存在此电脑，重启后仍可读取。</p>
+        <div class="library-actions"><button id="library-load" class="secondary-button" type="button">载入</button><button id="library-update" class="secondary-button" type="button">更新所选</button><button id="library-delete" class="secondary-button danger-text" type="button">删除</button></div>
+      </section>
+
+      <section class="map-panel" aria-label="路线地图">
+        <div class="map-heading"><div><span class="eyebrow">YOUR ROUTE, YOUR PACE</span><h2>把路线画出来。</h2></div><span class="map-mode" id="map-mode-label">路线编辑</span></div>
+        <div class="map-location-actions" role="group" aria-label="地图快速定位">
+          <button class="secondary-button" id="locate-button" type="button">◎ 一键定位</button>
+          <button class="secondary-button" id="save-school-button" type="button">保存学校位置</button>
+          <button class="secondary-button" id="school-button" type="button">回到学校</button>
+          <button class="secondary-button" id="follow-button" type="button" aria-pressed="false">跟随回放：关</button>
+          <span id="location-status" role="status" aria-live="polite">定位使用电脑位置；保存以地图中心为准</span>
+        </div>
+        <div id="map" aria-label="点击添加路线点的交互地图" tabindex="0"></div>
+        <div class="map-offline" id="map-offline" hidden>地图底图暂不可用。仍可通过左侧坐标输入、导入与导出编辑路线。</div>
+        <div class="map-tip" id="map-tip"><span class="tip-dot"></span>点击地图添加途经点 · 拖动标记调整位置</div>
+        <div class="map-footer"><span><i class="legend-line"></i>规划路线</span><span><i class="legend-point"></i>当前回放位置</span><span class="map-network">底图需要联网</span></div>
+      </section>
+
+      <aside class="panel device-panel" aria-labelledby="device-title">
+        <div class="panel-heading"><div><span class="eyebrow">02 / PLAYBACK</span><h2 id="device-title">连接与回放</h2></div><span class="connection-dot" id="connection-dot" aria-hidden="true"></span></div>
+        <label class="field-label" for="mode">输出设备</label>
+        <select id="mode"><option value="preview">仅在地图预览</option><option value="android">Android / MuMu（ADB）</option><option value="mumu">MuMu（管理器定位）</option><option value="ios">iPhone / iPad（USB）</option><option value="avd">Android 官方模拟器（AVD）</option></select>
+        <p class="mode-description" id="mode-description">先预览路线与速度。预览模式不会向设备发送定位数据。</p>
+
+        <div id="android-fields" class="device-fields" hidden>
+          <div class="section-label"><label for="android-device">ADB 设备</label><button class="text-button refresh-button" type="button">刷新</button></div>
+          <select id="android-device"><option value="">请刷新并选择设备</option></select>
+          <div id="android-helper"><button class="secondary-button full-width" id="setup-button">安装定位助手并打开设置</button><p class="field-hint">需在设备开发者选项中，将本项目助手选为“模拟位置信息应用”。</p></div>
+          <details id="adb-connect"><summary>连接 MuMu ADB</summary><label>ADB 地址<input id="adb-address" type="text" value="127.0.0.1:16384" placeholder="127.0.0.1:16384" spellcheck="false"></label><button class="secondary-button full-width" id="connect-button">连接此地址</button><p class="field-hint">端口以 MuMu 实例设置为准；不同版本与实例可能不同。</p></details>
+        </div>
+        <div id="ios-fields" class="device-fields" hidden>
+          <div class="section-label"><label for="ios-device">USB 设备</label><button class="text-button refresh-button" type="button">刷新</button></div>
+          <select id="ios-device"><option value="">请刷新并选择设备</option></select><p class="field-hint">需要解锁并信任此电脑。系统版本、开发者模式、开发者镜像与隧道环境会影响兼容性。</p>
+        </div>
+        <div id="mumu-fields" class="device-fields" hidden>
+          <label>MuMu 管理器路径<input id="manager" type="text" placeholder="C:\…\MuMuManager.exe" spellcheck="false"></label><label>实例编号<input id="instance" type="number" min="0" max="9999" step="1" value="0"></label><p class="field-hint">使用支持定位命令的 MuMu 管理器。可用能力取决于本机版本。</p>
+        </div>
+        <label class="checkbox-field" id="sensor-field" hidden><input id="sensor" type="checkbox"><span>同时回放 AVD 加速度传感器<small>仅支持 Android 官方模拟器</small></span></label>
+        <div id="device-notice" class="device-notice" hidden></div>
+        <div class="section-divider"></div>
+
+        <div class="section-label"><h3>回放状态</h3><span class="status-pill" id="run-state" data-state="idle">尚未开始</span></div>
+        <div class="progress-head"><strong id="progress-percent">0<span>%</span></strong><span id="progress-distance">0 / 0 米</span></div>
+        <div class="progress-track" role="progressbar" aria-label="回放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progress-track"><div id="progress-fill"></div></div>
+        <div class="run-stats"><div><span>已回放时间</span><strong id="elapsed-time">00:00</strong></div><div><span>当前位置</span><strong id="current-position" class="position-value">—</strong></div></div>
+        <button class="primary-button" id="start-button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6Z"/></svg><span>开始预览</span></button>
+        <div class="playback-controls"><button class="secondary-button" id="pause-button" disabled>暂停</button><button class="secondary-button" id="stop-button" disabled>停止</button></div>
+        <button class="secondary-button" id="quit-button" type="button">停止并退出</button>
+        <p class="help-text">关闭浏览器标签页不会退出后台，请使用上方退出按钮。</p>
+        <p id="send-diagnostics" class="mode-description" aria-live="polite">开始回放后显示坐标发送状态。</p>
+        <p id="ios-motion-note" class="mode-description" hidden>iOS 接口只设置经纬度，不发送步数、运动传感器或速度字段。请先用 iPhone 地图核对位置变化；乐跑的运动状态不代表 GPS 是否移动。</p>
+        <div class="notice" role="status" aria-live="polite" id="notice" hidden></div>
+        <div class="compatibility-note"><span aria-hidden="true">i</span><p>定位回放不代表步道乐跑会认可。真机不支持通用加速度注入；设备支持情况以实际连接结果为准。</p></div>
+        <div class="device-footer"><span id="server-status">正在连接本机服务…</span><span id="app-version"></span></div>
+      </aside>
+    </main>
+    <footer class="app-footer"><span>从规划到回放，每一步都看得见。</span><span>本机运行 · 路线保存在此浏览器</span></footer>
+  </div>
+
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">开始使用</h2><button class="icon-button" id="close-help-button" aria-label="关闭说明">×</button></div><ol class="help-steps"><li><strong>规划路线</strong><p>点击地图添加至少两个点，或导入 GPX / GeoJSON。坐标使用 WGS84，经纬度顺序由文件格式决定。</p></li><li><strong>先预览，再选择设备</strong><p>设置速度和循环次数，选择地图预览检查轨迹。连接真机时，需要完成相应开发者环境配置。</p></li><li><strong>观察实际状态</strong><p>界面只显示服务返回的回放位置和进度。连接失败时会显示原因；停止后请核对设备定位是否恢复。</p></li></ol><p class="help-note">地图底图来自 OpenStreetMap，加载底图会向地图服务发送所浏览区域的瓦片请求。路线保存使用浏览器本地存储，导出文件可备份或分享。</p><button class="primary-button" id="help-done-button">知道了</button></dialog>
+</body>
+</html>

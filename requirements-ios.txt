@@ -1,0 +1,2 @@
+# The async tunnel API is version-specific. This version is covered by adapter tests.
+pymobiledevice3==10.7.4

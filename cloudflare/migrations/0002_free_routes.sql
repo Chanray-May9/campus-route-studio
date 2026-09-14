@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS remote_routes(id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated REAL NOT NULL);

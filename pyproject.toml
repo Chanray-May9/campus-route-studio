@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "campus-route-studio"
+version = "0.1.0"
+description = "Local route editor with Android, MuMu and iOS location replay adapters"
+requires-python = ">=3.11"
+license = {text = "GPL-3.0-or-later"}
+dependencies = []
+
+[project.optional-dependencies]
+ios = ["pymobiledevice3==10.7.4"]
+
+[project.scripts]
+campus-route-studio = "route_studio.server:main"
+
+[tool.setuptools.packages.find]
+include = ["route_studio*"]
+
+[tool.setuptools.package-data]
+route_studio = ["web/*", "web/vendor/*", "web/vendor/images/*"]
