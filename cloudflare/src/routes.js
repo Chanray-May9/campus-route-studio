@@ -18,5 +18,7 @@ export function routeEntry(data) {
   if(length<1)throw Error('路线必须至少 1 米');
   const m=data.motion||{},mode=m.mode||'fixed';if(!['fixed','smooth','alternating'].includes(mode))throw Error('速度方式无效');
   const low=num(m,'low',speed,.2,20);
-  return {id,name:data.name.trim(),route:{points,speed,loops,interval},motion:{mode,speed:num(m,'speed',speed,.2,20),low,high:num(m,'high',speed,low,20),period:num(m,'period',10,2,120),sway:num(m,'sway',0,0,3),swayPeriod:num(m,'swayPeriod',4,2,30)}};
+  const entry={id,name:data.name.trim(),route:{points,speed,loops,interval},motion:{mode,speed:num(m,'speed',speed,.2,20),low,high:num(m,'high',speed,low,20),period:num(m,'period',10,2,120),sway:num(m,'sway',0,0,3),swayPeriod:num(m,'swayPeriod',4,2,30)}};
+  if(data.default===true)entry.default=true;
+  return entry;
 }

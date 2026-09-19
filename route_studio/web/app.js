@@ -2,6 +2,8 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  const toMap = point => window.CampusCoords.wgsToGcj(point);
+  const fromMap = point => window.CampusCoords.gcjToWgs(point);
   const STORAGE_KEY = 'campus-route-studio:route:v1';
   const SCHOOL_KEY = 'campus-route-studio:school:v1';
   let libraryEntries = [];
@@ -92,7 +94,8 @@
     ios: '通过 USB 与 iOS 开发者服务回放定位。需要匹配系统版本的开发环境，无法保证所有 iOS 版本可用。',
     avd: '面向 Android Studio 官方模拟器。可用模拟器控制台同时回放定位与加速度数据。'
   };
-  let points = [];
+  const DEFAULT_POINTS = [{lat:29.51264659,lon:106.69253011},{lat:29.51204124,lon:106.69388141},{lat:29.51191977,lon:106.69394581},{lat:29.51175158,lon:106.69396727},{lat:29.51162077,lon:106.69392434},{lat:29.51150865,lon:106.69381701},{lat:29.51145258,lon:106.69364529},{lat:29.51148061,lon:106.69348430},{lat:29.51214402,lon:106.69223932},{lat:29.51222811,lon:106.69211053},{lat:29.51236827,lon:106.69209980},{lat:29.51254580,lon:106.69212126},{lat:29.51264858,lon:106.69217493},{lat:29.51264659,lon:106.69253011}];
+  let points = DEFAULT_POINTS.map(point => ({...point}));
   let map = null;
   let routeLayer = null;
   let markerLayer = null;
@@ -125,7 +128,7 @@
     followPlayback = !followPlayback;
     $('follow-button').textContent = `跟随回放：${followPlayback ? '开' : '关'}`;
     $('follow-button').setAttribute('aria-pressed', String(followPlayback));
-    if (followPlayback && map && run.point) map.setView([run.point.lat, run.point.lon], Math.max(18, map.getZoom()));
+    if (followPlayback && map && run.point) { const p = toMap(run.point); map.setView([p.lat, p.lon], Math.max(18, map.getZoom())); }
   });
 
   function savedSchool() {
@@ -139,9 +142,10 @@
   function centerLocation(lat, lon, zoom = 16) {
     if (!map) throw new Error('地图未加载，请稍后重试。');
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 85 || Math.abs(lon) > 180) throw new Error('定位返回的坐标无效。');
-    map.setView([lat, lon], zoom);
+    const display = toMap({lat, lon});
+    map.setView([display.lat, display.lon], zoom);
     if (locationMarker) map.removeLayer(locationMarker);
-    locationMarker = L.circleMarker([lat, lon], {radius: 8, color: '#fff', weight: 3, fillColor: '#267be0', fillOpacity: 1, interactive: false}).addTo(map);
+    locationMarker = L.circleMarker([display.lat, display.lon], {radius: 8, color: '#fff', weight: 3, fillColor: '#267be0', fillOpacity: 1, interactive: false}).addTo(map);
   }
 
   $('locate-button').addEventListener('click', () => {
@@ -166,8 +170,8 @@
   $('save-school-button').addEventListener('click', () => {
     if (!map) return;
     try {
-      const center = map.getCenter();
-      localStorage.setItem(SCHOOL_KEY, JSON.stringify({lat: center.lat, lon: ((center.lng + 180) % 360 + 360) % 360 - 180, zoom: map.getZoom()}));
+      const center = fromMap({lat: map.getCenter().lat, lon: map.getCenter().lng});
+      localStorage.setItem(SCHOOL_KEY, JSON.stringify({lat: center.lat, lon: ((center.lon + 180) % 360 + 360) % 360 - 180, zoom: map.getZoom()}));
       $('school-button').disabled = false;
       $('location-status').textContent = '学校位置已保存到此浏览器。下次打开会自动回到这里。';
     } catch { notify('浏览器无法保存位置，请检查本地存储权限。', true); }
@@ -309,22 +313,23 @@
 
   function drawRoute(fit = false) {
     if (!map) return;
-    routeLayer.setLatLngs(points.map(point => [point.lat, point.lon]));
+    routeLayer.setLatLngs(points.map(point => { const p = toMap(point); return [p.lat, p.lon]; }));
     markerLayer.clearLayers();
     points.forEach((point, index) => {
-      const marker = L.marker([point.lat, point.lon], {icon: markerIcon(index, points.length), draggable: !editingLocked(), title: `途经点 ${index + 1}：拖动调整坐标`, keyboard: true}).addTo(markerLayer);
+      const display = toMap(point);
+      const marker = L.marker([display.lat, display.lon], {icon: markerIcon(index, points.length), draggable: !editingLocked(), title: `途经点 ${index + 1}：拖动调整坐标`, keyboard: true}).addTo(markerLayer);
       marker.on('dragend', (event) => {
         if (editingLocked()) { drawRoute(); return; }
-        const position = event.target.getLatLng();
+        const position = fromMap({lat: event.target.getLatLng().lat, lon: event.target.getLatLng().lng});
         const lat = Math.max(-90, Math.min(90, position.lat));
-        const lon = ((position.lng + 180) % 360 + 360) % 360 - 180;
+        const lon = ((position.lon + 180) % 360 + 360) % 360 - 180;
         points[index] = {lat, lon};
         changeCount++;
         renderRoute();
       });
     });
     if (fit && points.length) {
-      if (points.length === 1) map.setView([points[0].lat, points[0].lon], 16);
+      if (points.length === 1) { const p = toMap(points[0]); map.setView([p.lat, p.lon], 16); }
       else map.fitBounds(routeLayer.getBounds(), {paddingTopLeft: [50, 135], paddingBottomRight: [50, 110], maxZoom: 17, animate: false});
     }
   }
@@ -393,12 +398,13 @@
       $('map-offline').hidden = false;
       return;
     }
-    map = L.map('map', {zoomControl: false, attributionControl: true, preferCanvas: true, worldCopyJump: true}).setView([30.2741, 120.1551], 15);
+    const initial = toMap({lat: 30.2741, lon: 120.1551});
+    map = L.map('map', {zoomControl: false, attributionControl: true, preferCanvas: true, worldCopyJump: true}).setView([initial.lat, initial.lon], 15);
     L.control.zoom({position: 'topright'}).addTo(map);
     const school = savedSchool();
     $('school-button').disabled = !school;
-    if (school) map.setView([school.lat, school.lon], Math.max(1, Math.min(19, school.zoom || 16)));
-    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'}).addTo(map);
+    if (school) { const p = toMap(school); map.setView([p.lat, p.lon], Math.max(1, Math.min(19, school.zoom || 16))); }
+    const tiles = L.tileLayer('https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {maxZoom: 19, attribution: '&copy; 高德地图'}).addTo(map);
     let failed = 0;
     let succeeded = 0;
     tiles.on('loading', () => { failed = 0; succeeded = 0; });
@@ -409,7 +415,7 @@
     window.addEventListener('online', () => { tiles.redraw(); });
     routeLayer = L.polyline([], {color: '#0d746b', weight: 4, opacity: 0.88, lineJoin: 'round', lineCap: 'round'}).addTo(map);
     markerLayer = L.layerGroup().addTo(map);
-    map.on('click', (event) => addPoint({lat: event.latlng.lat, lon: ((event.latlng.lng + 180) % 360 + 360) % 360 - 180}));
+    map.on('click', (event) => addPoint(fromMap({lat: event.latlng.lat, lon: event.latlng.lng})));
     if (window.ResizeObserver) new ResizeObserver(() => map.invalidateSize()).observe($('map'));
   }
 
@@ -484,7 +490,8 @@
     if (run.point && Number.isFinite(run.point.lat) && Number.isFinite(run.point.lon)) {
       $('current-position').textContent = `${run.point.lat.toFixed(7)}, ${run.point.lon.toFixed(7)}`;
       if (map) {
-        const position = [run.point.lat, run.point.lon];
+        const display = toMap(run.point);
+        const position = [display.lat, display.lon];
         if (!playbackMarker) playbackMarker = L.marker(position, {icon: L.divIcon({className: 'route-map-marker current-marker', iconSize: [23, 23], iconAnchor: [11.5, 11.5]}), zIndexOffset: 1000, interactive: false, title: '当前回放位置'}).addTo(map);
         else playbackMarker.setLatLng(position);
         if (followPlayback) map.setView(position, Math.max(18, map.getZoom()), {animate: false});
@@ -607,10 +614,10 @@
   });
   $('demo-button').addEventListener('click', () => {
     if (editingLocked()) return;
-    points = [{lat: 30.27304, lon: 120.14775}, {lat: 30.27431, lon: 120.14786}, {lat: 30.27519, lon: 120.14945}, {lat: 30.27495, lon: 120.15066}, {lat: 30.27338, lon: 120.15048}, {lat: 30.27289, lon: 120.14896}, {lat: 30.27304, lon: 120.14775}];
+    points = DEFAULT_POINTS.map(point => ({...point}));
     changeCount++;
     renderRoute(true);
-    notify('已载入杭州示例路线，仅用于展示编辑与回放；请根据实际地图规划自己的路线。');
+    notify('已载入“重庆建筑工程职业学院东站校区操场”，请在开始前核对路线与实际场地。');
   });
   $('speed').addEventListener('input', updateEstimates);
   $('loops').addEventListener('input', updateEstimates);
@@ -728,7 +735,7 @@
 
   initializeMap();
   libraryAction(() => refreshLibrary());
-  renderRoute();
+  renderRoute(true);
   modeChanged();
   refreshStatus();
   setInterval(() => { if (!document.hidden || isActive()) refreshStatus(); }, 1000);

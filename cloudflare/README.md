@@ -1,6 +1,6 @@
-# 免费轨迹后端：Cloudflare Workers + D1
+# 轨迹后端：Cloudflare Workers + D1
 
-接口：GET /api/routes 无需账号，GET/POST/DELETE /api/admin/routes 需要 CR_ADMIN_TOKEN；/admin 是管理页面。用户无需手机号，后端无收费、授权和试用限制。定位回放不向服务器持续上报。
+接口：`GET /api/routes` 用于读取公开轨迹，`GET/POST/DELETE /api/admin/routes` 需要 `CR_ADMIN_TOKEN`；`/admin` 是管理页面。定位回放不会向服务器持续上报。
 
 安装 Node.js 24，进入本目录执行 npm ci 与 npm test。管理员密钥放在本地 .dev.vars（随机至少 32 字符，不能提交源码）。
 
@@ -13,4 +13,4 @@
 
 本地验证：npx wrangler d1 migrations apply campus-route-db --local，npx wrangler dev。最多发布 50 条结构化路线，每条 2–10000 点。不能下发脚本或 APK。
 
-Workers 与 D1 有免费额度；超额可能影响服务。[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)、[D1 额度](https://developers.cloudflare.com/d1/platform/pricing/)。没有付费升级步骤。
+Workers 与 D1 的资源额度及计费规则以 Cloudflare 当前文档为准：[Workers 限制](https://developers.cloudflare.com/workers/platform/limits/)、[D1 额度](https://developers.cloudflare.com/d1/platform/pricing/)。

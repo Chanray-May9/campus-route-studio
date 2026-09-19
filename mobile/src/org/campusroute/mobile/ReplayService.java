@@ -6,6 +6,7 @@ import android.content.*;
 import android.content.pm.PackageManager;
 import android.location.*;
 import android.os.*;
+import java.util.ArrayList;
 import org.json.JSONObject;
 
 public final class ReplayService extends Service {
@@ -18,7 +19,8 @@ public final class ReplayService extends Service {
     RouteEngine engine;
     PowerManager.WakeLock wake;
     long previous,sent;
-    boolean gpsAdded,networkAdded;
+    final ArrayList<String> providers=new ArrayList<>();
+    final JSONObject providerErrors=new JSONObject();
     public static boolean active(){return instance!=null&&(state.equals("running")||state.equals("paused")||state.equals("starting"));}
     @Override public void onCreate(){super.onCreate();instance=this;locations=getSystemService(LocationManager.class);}
     @Override public int onStartCommand(Intent intent,int flags,int id){
@@ -31,8 +33,9 @@ public final class ReplayService extends Service {
             if(getSystemService(AppOpsManager.class).checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION,android.os.Process.myUid(),getPackageName())!=AppOpsManager.MODE_ALLOWED)throw new SecurityException("请在开发者选项中选择“校园路线”为模拟位置应用");
             if(Build.VERSION.SDK_INT>=28&&!locations.isLocationEnabled())throw new IllegalStateException("请开启手机定位服务");
             JSONObject config=new JSONObject(intent.getStringExtra("config"));engine=new RouteEngine(config.getJSONObject("route"),config.optJSONObject("motion"));
-            locations.addTestProvider("gps",false,false,false,false,true,true,true,Criteria.POWER_LOW,Criteria.ACCURACY_FINE);gpsAdded=true;locations.setTestProviderEnabled("gps",true);
-            locations.addTestProvider("network",false,false,false,false,true,true,true,Criteria.POWER_LOW,Criteria.ACCURACY_FINE);networkAdded=true;locations.setTestProviderEnabled("network",true);
+            registerProvider(LocationManager.GPS_PROVIDER);
+            registerProvider(LocationManager.NETWORK_PROVIDER);
+            if(providers.isEmpty())throw new IllegalStateException("GPS 和网络模拟提供器都无法启用："+providerErrors.toString());
             wake=getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"campusroute:StandaloneReplay");wake.setReferenceCounted(false);wake.acquire(15000);
             previous=SystemClock.elapsedRealtime();state="running";handler.post(tick);
         }catch(Exception e){stop("error",message(e));}
@@ -43,13 +46,20 @@ public final class ReplayService extends Service {
             long now=SystemClock.elapsedRealtime();double dt=(now-previous)/1000.0;previous=now;
             engine.advance(dt,Double.POSITIVE_INFINITY);
             JSONObject point=engine.point();long time=System.currentTimeMillis(),nanos=SystemClock.elapsedRealtimeNanos();
-            for(String provider:new String[]{"gps","network"}){Location l=new Location(provider);l.setLatitude(point.getDouble("lat"));l.setLongitude(point.getDouble("lon"));l.setAccuracy(5);l.setSpeed((float)point.getDouble("speed"));l.setBearing((float)point.getDouble("bearing"));l.setTime(time);l.setElapsedRealtimeNanos(nanos);locations.setTestProviderLocation(provider,l);}
-            sent++;last=new JSONObject().put("distance",engine.distance).put("elapsed",engine.elapsed).put("point",point).put("sent",sent).put("laps",(int)(engine.distance/engine.lap)).put("infinite",engine.loops==0).put("total",engine.loops==0?JSONObject.NULL:engine.total);
+            for(String provider:new ArrayList<>(providers)){Location l=new Location(provider);l.setLatitude(point.getDouble("lat"));l.setLongitude(point.getDouble("lon"));l.setAccuracy(5);l.setSpeed((float)point.getDouble("speed"));l.setBearing((float)point.getDouble("bearing"));l.setTime(time);l.setElapsedRealtimeNanos(nanos);if(Build.VERSION.SDK_INT>=26){l.setSpeedAccuracyMetersPerSecond(.25f);l.setBearingAccuracyDegrees(3f);l.setVerticalAccuracyMeters(5f);}locations.setTestProviderLocation(provider,l);}
+            sent++;last=new JSONObject().put("distance",engine.distance).put("elapsed",engine.elapsed).put("point",point).put("sent",sent).put("providers",new org.json.JSONArray(providers)).put("providerErrors",providerErrors).put("laps",(int)(engine.distance/engine.lap)).put("infinite",engine.loops==0).put("total",engine.loops==0?JSONObject.NULL:engine.total);
             if(engine.distance>=engine.total){stop("completed","");return;}
             if(wake!=null)wake.acquire(15000);handler.postDelayed(this,1000);
         }catch(Exception e){stop("error",message(e));}
     }};
     static String message(Exception e){return e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();}
+    void registerProvider(String provider){
+        try{locations.addTestProvider(provider,false,false,false,false,true,true,true,Criteria.POWER_LOW,provider.equals(LocationManager.GPS_PROVIDER)?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE);locations.setTestProviderEnabled(provider,true);providers.add(provider);}
+        catch(Exception first){
+            try{locations.removeTestProvider(provider);locations.addTestProvider(provider,false,false,false,false,true,true,true,Criteria.POWER_LOW,provider.equals(LocationManager.GPS_PROVIDER)?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE);locations.setTestProviderEnabled(provider,true);providers.add(provider);}
+            catch(Exception retry){try{providerErrors.put(provider,message(retry));}catch(Exception ignored){}}
+        }
+    }
     void notifyRunning(){
         NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("replay","轨迹回放",NotificationManager.IMPORTANCE_LOW));
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MobileActivity.class),PendingIntent.FLAG_IMMUTABLE);
@@ -59,8 +69,8 @@ public final class ReplayService extends Service {
     }
     void cleanup(){
         handler.removeCallbacks(tick);if(wake!=null&&wake.isHeld())wake.release();
-        for(String provider:new String[]{"gps","network"}){boolean added=provider.equals("gps")?gpsAdded:networkAdded;if(!added)continue;try{locations.removeTestProvider(provider);}catch(Exception e){cleanupError=message(e);}}
-        gpsAdded=false;networkAdded=false;
+        for(String provider:new ArrayList<>(providers)){try{locations.removeTestProvider(provider);}catch(Exception e){cleanupError=message(e);}}
+        providers.clear();
     }
     void stop(String next,String reason){state=next;error=reason;cleanup();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
     public static JSONObject status() throws Exception {return new JSONObject(last.toString()).put("state",state).put("error",error).put("cleanupError",cleanupError);}

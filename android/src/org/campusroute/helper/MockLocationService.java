@@ -22,6 +22,8 @@ import android.os.PowerManager;
 import android.os.Process;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Official mock providers only. This service does not modify sensor data. */
 public final class MockLocationService extends Service {
@@ -35,6 +37,7 @@ public final class MockLocationService extends Service {
     private PowerManager.WakeLock wakeLock;
     private long lastUpdate;
     private boolean active;
+    private final List<String> activeProviders = new ArrayList<>();
     private final Runnable watchdog = new Runnable() {
         @Override public void run() {
             if (!active) return;
@@ -61,11 +64,10 @@ public final class MockLocationService extends Service {
             verifySetup();
             showNotification();
             if (!active) {
-                for (String provider : PROVIDERS) {
-                    locations.addTestProvider(provider, false, false, false, false,
-                        true, true, true, Criteria.POWER_LOW, Criteria.ACCURACY_FINE);
-                    locations.setTestProviderEnabled(provider, true);
-                }
+                StringBuilder failures = new StringBuilder();
+                for (String provider : PROVIDERS) registerProvider(provider, failures);
+                if (activeProviders.isEmpty()) throw new IllegalStateException(
+                    "GPS and network mock providers both failed: " + failures);
                 active = true;
             }
             lastUpdate = SystemClock.elapsedRealtime();
@@ -99,6 +101,26 @@ public final class MockLocationService extends Service {
         }
         if (Build.VERSION.SDK_INT >= 28 && !locations.isLocationEnabled()) {
             throw new IllegalStateException("Enable the device Location setting");
+        }
+    }
+
+    private void registerProvider(String provider, StringBuilder failures) {
+        try {
+            locations.addTestProvider(provider, false, false, false, false, true, true, true,
+                Criteria.POWER_LOW, provider.equals(LocationManager.GPS_PROVIDER) ? Criteria.ACCURACY_FINE : Criteria.ACCURACY_COARSE);
+            locations.setTestProviderEnabled(provider, true);
+            activeProviders.add(provider);
+        } catch (RuntimeException first) {
+            try {
+                locations.removeTestProvider(provider);
+                locations.addTestProvider(provider, false, false, false, false, true, true, true,
+                    Criteria.POWER_LOW, provider.equals(LocationManager.GPS_PROVIDER) ? Criteria.ACCURACY_FINE : Criteria.ACCURACY_COARSE);
+                locations.setTestProviderEnabled(provider, true);
+                activeProviders.add(provider);
+            } catch (RuntimeException retry) {
+                if (failures.length() > 0) failures.append("; ");
+                failures.append(provider).append(": ").append(CommandReceiver.message(retry));
+            }
         }
     }
 
@@ -153,7 +175,7 @@ public final class MockLocationService extends Service {
         long now = System.currentTimeMillis();
         long elapsedNanos = SystemClock.elapsedRealtimeNanos();
         try {
-            for (String provider : PROVIDERS) {
+            for (String provider : new ArrayList<>(service.activeProviders)) {
                 Location location = new Location(provider);
                 location.setLatitude(latitude);
                 location.setLongitude(longitude);
@@ -162,6 +184,11 @@ public final class MockLocationService extends Service {
                 location.setBearing(bearing);
                 location.setTime(now);
                 location.setElapsedRealtimeNanos(elapsedNanos);
+                if (Build.VERSION.SDK_INT >= 26) {
+                    location.setSpeedAccuracyMetersPerSecond(.25f);
+                    location.setBearingAccuracyDegrees(3f);
+                    location.setVerticalAccuracyMeters(5f);
+                }
                 service.locations.setTestProviderLocation(provider, location);
             }
             service.lastUpdate = SystemClock.elapsedRealtime();
@@ -176,12 +203,13 @@ public final class MockLocationService extends Service {
         active = false;
         handler.removeCallbacks(watchdog);
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
-        removeProviders(locations);
+        removeProviders(locations, new ArrayList<>(activeProviders));
+        activeProviders.clear();
     }
 
-    private static void removeProviders(LocationManager manager) {
+    private static void removeProviders(LocationManager manager, Iterable<String> providers) {
         RuntimeException first = null;
-        for (String provider : PROVIDERS) {
+        for (String provider : providers) {
             try { manager.removeTestProvider(provider); }
             catch (IllegalArgumentException absent) { /* Provider absent on an older Android release. */ }
             catch (RuntimeException error) { if (first == null) first = error; }
@@ -193,7 +221,7 @@ public final class MockLocationService extends Service {
         MockLocationService service = instance;
         try {
             if (service != null) service.cleanup();
-            else removeProviders(context.getSystemService(LocationManager.class));
+            else removeProviders(context.getSystemService(LocationManager.class), java.util.Arrays.asList(PROVIDERS));
         } finally {
             if (service != null) service.stopForeground(STOP_FOREGROUND_REMOVE);
             context.stopService(new Intent(context, MockLocationService.class));

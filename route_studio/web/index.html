@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/vendor/leaflet.css">
   <link rel="stylesheet" href="/styles.css">
   <script src="/vendor/leaflet.js" defer></script>
+  <script src="/vendor/coord.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -26,7 +27,7 @@
         <div class="panel-heading"><div><span class="eyebrow">01 / PLAN</span><h1 id="route-title">规划一条路线</h1></div><span class="step-symbol" aria-hidden="true">↗</span></div>
         <p class="panel-description">在地图上点选途经点，拖动标记微调。也可以直接输入坐标。</p>
         <div class="route-summary"><div><span id="route-distance">0</span><small id="route-distance-unit">米</small><p>单圈路线</p></div><div><span id="route-point-count">0</span><small>个</small><p>途经点</p></div></div>
-        <div class="section-label"><h2>途经点</h2><button class="text-button" id="demo-button">载入示例</button></div>
+        <div class="section-label"><h2>途经点</h2><button class="text-button" id="demo-button">载入默认操场</button></div>
         <ol class="waypoints" id="waypoints" aria-label="路线途经点"><li class="empty-state">从第一个点开始<br><span>点击地图，或在下方添加坐标</span></li></ol>
         <form class="coordinate-form" id="coordinate-form">
           <div class="coordinate-inputs"><label>纬度<input id="latitude" type="number" min="-85" max="85" step="any" placeholder="30.2741" inputmode="decimal" required></label><label>经度<input id="longitude" type="number" min="-180" max="180" step="any" placeholder="120.1551" inputmode="decimal" required></label><button class="add-button" type="submit" aria-label="添加坐标点">+</button></div>
@@ -118,6 +119,6 @@
     <footer class="app-footer"><span>从规划到回放，每一步都看得见。</span><span>本机运行 · 路线保存在此浏览器</span></footer>
   </div>
 
-  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">开始使用</h2><button class="icon-button" id="close-help-button" aria-label="关闭说明">×</button></div><ol class="help-steps"><li><strong>规划路线</strong><p>点击地图添加至少两个点，或导入 GPX / GeoJSON。坐标使用 WGS84，经纬度顺序由文件格式决定。</p></li><li><strong>先预览，再选择设备</strong><p>设置速度和循环次数，选择地图预览检查轨迹。连接真机时，需要完成相应开发者环境配置。</p></li><li><strong>观察实际状态</strong><p>界面只显示服务返回的回放位置和进度。连接失败时会显示原因；停止后请核对设备定位是否恢复。</p></li></ol><p class="help-note">地图底图来自 OpenStreetMap，加载底图会向地图服务发送所浏览区域的瓦片请求。路线保存使用浏览器本地存储，导出文件可备份或分享。</p><button class="primary-button" id="help-done-button">知道了</button></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title">开始使用</h2><button class="icon-button" id="close-help-button" aria-label="关闭说明">×</button></div><ol class="help-steps"><li><strong>规划路线</strong><p>点击地图添加至少两个点，或导入 GPX / GeoJSON。输入与导出的坐标使用 WGS84。</p></li><li><strong>先预览，再选择设备</strong><p>设置速度和循环次数，选择地图预览检查轨迹。连接真机时，需要完成相应开发者环境配置。</p></li><li><strong>观察实际状态</strong><p>界面只显示服务返回的回放位置和进度。连接失败时会显示原因；停止后请核对设备定位是否恢复。</p></li></ol><p class="help-note">底图使用高德地图，并在显示时自动处理 GCJ-02 坐标；加载底图会向高德发送所浏览区域的瓦片请求。路线仍以 WGS84 保存，导出文件可备份或分享。</p><button class="primary-button" id="help-done-button">知道了</button></dialog>
 </body>
 </html>

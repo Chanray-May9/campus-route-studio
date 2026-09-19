@@ -10,7 +10,7 @@ public final class ApiClient {
     public ApiClient(AppStore s){store=s;}
     public JSONObject request(String path) throws Exception {
         String base=store.config.optString("backend");
-        if(base.isEmpty())throw new IllegalStateException("尚未配置轨迹服务器，本地编辑和回放仍可免费使用");
+        if(base.isEmpty())throw new IllegalStateException("尚未配置轨迹服务器，请先在 config.json 中填写 backend 地址");
         URL url=new URL(base+path);if(!url.getProtocol().equals("https"))throw new SecurityException("后端必须使用 HTTPS");
         HttpURLConnection connection=(HttpURLConnection)url.openConnection();connection.setConnectTimeout(10000);connection.setReadTimeout(15000);connection.setInstanceFollowRedirects(false);
         try {

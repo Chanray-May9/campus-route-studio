@@ -16,6 +16,18 @@ public final class AppStore {
         java.io.ByteArrayOutputStream output=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[4096];int n;
         while((n=input.read(buffer))!=-1)output.write(buffer,0,n);input.close();
         config=new JSONObject(new String(output.toByteArray(),StandardCharsets.UTF_8));
+        seedDefaultRoute();
+    }
+    void seedDefaultRoute() throws Exception {
+        final int version=1;if(prefs.getInt("default_route_version",0)>=version)return;
+        java.io.InputStream input=context.getAssets().open("default-route.json");java.io.ByteArrayOutputStream output=new java.io.ByteArrayOutputStream();byte[] buffer=new byte[4096];int n;
+        while((n=input.read(buffer))!=-1)output.write(buffer,0,n);input.close();
+        JSONObject bundled=new JSONObject(new String(output.toByteArray(),StandardCharsets.UTF_8));new RouteEngine(bundled.getJSONObject("route"),bundled.optJSONObject("motion"));
+        JSONArray previous=library(),next=new JSONArray();boolean replaced=false;String id=bundled.getString("id");
+        bundled.put("updated",System.currentTimeMillis());
+        for(int i=0;i<previous.length();i++){JSONObject entry=previous.getJSONObject(i);if(id.equals(entry.optString("id"))){next.put(bundled);replaced=true;}else next.put(entry);}
+        if(!replaced)next.put(bundled);
+        if(!prefs.edit().putString("library",next.toString()).putInt("default_route_version",version).commit())throw new IllegalStateException("默认轨迹保存失败");
     }
     public JSONArray library() throws Exception {return new JSONArray(prefs.getString("library","[]"));}
     public JSONObject save(JSONObject data) throws Exception {
