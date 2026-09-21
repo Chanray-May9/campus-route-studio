@@ -7,6 +7,8 @@
   const STORAGE_KEY = 'campus-route-studio:route:v1';
   const SCHOOL_KEY = 'campus-route-studio:school:v1';
   // 自动保存的完整方案：路线 + 回放参数 + 变速参数 + 设备选项。
+  // 自动保存参数用的键。名字保持 v2 不变，这样之前存下的参数升级后还能读到；
+  // 记录内部的 version 字段才是真正的格式版本（v2 把参数放在 route 下，v3 放在 params 下）。
   const AUTO_KEY = 'campus-route-studio:settings:v2';
   // 只有“连续输入”（数字框敲键、拖动）才需要防抖把突发合并成一次写盘；
   // 下拉框、复选框、按钮、路线增删等离散操作一律立即写盘，不等这个延迟。
@@ -156,10 +158,10 @@
     const high = fieldNumber('motion-high', 0.2, 20, speed);
     const infinite = $('loop-mode').value === 'infinite';
     return {
-      version: 2,
+      version: 3,
       savedAt: new Date().toISOString(),
-      route: {
-        points: points.map(point => ({lat: point.lat, lon: point.lon})),
+      // 只自动保存回放参数，不保存轨迹点：轨迹由「保存到本机」和轨迹库负责。
+      params: {
         speed,
         loops: infinite ? 0 : fieldInteger('loops', 1, 10000, 1),
         interval: 1
@@ -175,7 +177,6 @@
       },
       ui: {
         mode: OUTPUT_MODES.has($('mode').value) ? $('mode').value : 'preview',
-        exportFormat: $('export-format').value === 'geojson' ? 'geojson' : 'gpx',
         adbAddress: $('adb-address').value.trim().slice(0, 255),
         manager: $('manager').value.trim().slice(0, 500),
         instance: fieldInteger('instance', 0, 9999, 0),
@@ -233,21 +234,19 @@
   }
 
   function applySavedSettings(saved) {
-    if (!saved || saved.version !== 2 || typeof saved !== 'object') return false;
+    if (!saved || typeof saved !== 'object' || (saved.version !== 2 && saved.version !== 3)) return false;
     let restored = false;
-    if (saved.route && Array.isArray(saved.route.points)) {
-      try {
-        const restoredPoints = validatePoints(saved.route.points);
-        const speed = validNumber(saved.route.speed, 0.2, 20);
-        const loops = validInteger(saved.route.loops, 0, 10000);
-        if (speed !== null) $('speed').value = speed;
-        if (loops !== null) {
-          $('loop-mode').value = loops === 0 ? 'infinite' : 'finite';
-          $('loops').value = loops || 1;
-        }
-        points = restoredPoints;
-        restored = true;
-      } catch { /* 保存的路线无效时保留默认操场路线 */ }
+    // v2 把参数放在 route 下，v3 放在 params 下；两者的轨迹点都一律忽略，绝不覆盖当前路线。
+    const params = (saved.version === 3 ? saved.params : saved.route) || {};
+    if (typeof params === 'object') {
+      const speed = validNumber(params.speed, 0.2, 20);
+      const loops = validInteger(params.loops, 0, 10000);
+      if (speed !== null) $('speed').value = speed;
+      if (loops !== null) {
+        $('loop-mode').value = loops === 0 ? 'infinite' : 'finite';
+        $('loops').value = loops || 1;
+      }
+      if (speed !== null || loops !== null) restored = true;
     }
     const motion = saved.motion;
     if (motion && typeof motion === 'object') {
@@ -262,7 +261,6 @@
     const ui = saved.ui;
     if (ui && typeof ui === 'object') {
       if (OUTPUT_MODES.has(ui.mode)) $('mode').value = ui.mode;
-      if (ui.exportFormat === 'geojson' || ui.exportFormat === 'gpx') $('export-format').value = ui.exportFormat;
       if (typeof ui.adbAddress === 'string') $('adb-address').value = ui.adbAddress.slice(0, 255);
       if (typeof ui.manager === 'string') $('manager').value = ui.manager.slice(0, 500);
       const instance = validInteger(ui.instance, 0, 9999);
@@ -276,34 +274,12 @@
     return restored;
   }
 
-  function applyLegacySettings(legacy) {
-    if (!legacy || legacy.version !== 1 || !legacy.route) return false;
-    const restored = validatePoints(legacy.route.points);
-    const speed = validNumber(legacy.route.speed, 0.2, 20);
-    const loops = validInteger(legacy.route.loops, 0, 10000);
-    if (speed === null || loops === null) return false;
-    points = restored;
-    $('speed').value = speed;
-    $('loop-mode').value = loops === 0 ? 'infinite' : 'finite';
-    $('loops').value = loops || 1;
-    return true;
-  }
-
   function restoreSettings() {
     let raw = null;
     try { raw = localStorage.getItem(AUTO_KEY); } catch { return false; }
-    if (raw) {
-      try { if (applySavedSettings(JSON.parse(raw))) return true; }
-      catch { /* 记录损坏时忽略，继续尝试旧版记录 */ }
-    }
-    // 没有自动保存记录时接管旧版“保存到本机”的方案，避免升级后方案被默认值顶掉。
-    let legacy = null;
-    try { legacy = localStorage.getItem(STORAGE_KEY); } catch { return false; }
-    if (!legacy) return false;
-    try { if (!applyLegacySettings(JSON.parse(legacy))) return false; }
+    if (!raw) return false;
+    try { return applySavedSettings(JSON.parse(raw)); }
     catch { return false; }
-    writeSettings();
-    return true;
   }
 
   function motionSettings() {
@@ -903,36 +879,33 @@
     downloadText(data.filename, data.text, data.mime);
     notify('路线文件已生成，浏览器将保存下载文件。');
   }));
-  function loadStoredPlan() {
-    let raw = null;
-    try { raw = localStorage.getItem(AUTO_KEY); } catch { raw = null; }
-    let saved = null;
-    if (raw) { try { saved = JSON.parse(raw); } catch { saved = null; } }
-    if (saved && saved.version === 2) {
-      if (!applySavedSettings(saved)) throw new Error('保存的方案格式不受支持。');
-      changeCount++;
-      renderRoute(true);
-      notify('已恢复上次保存的路线、回放参数与变速设置。');
-      return;
-    }
-    // 兼容旧版“保存到本机”写入的 v1 方案。
-    try { raw = localStorage.getItem(STORAGE_KEY); } catch { raw = null; }
-    if (!raw) throw new Error('此浏览器尚未保存方案。');
-    let legacy = null;
-    try { legacy = JSON.parse(raw); } catch { throw new Error('保存的方案格式不受支持。'); }
-    if (!applyLegacySettings(legacy)) throw new Error('保存的方案格式不受支持。');
-    changeCount++;
-    renderRoute(true);
-    notify('已恢复旧版保存的路线与回放参数。');
-  }
-
+  // 「保存到本机」/「读取上次方案」维持原样：显式保存和恢复整条轨迹。
   $('save-button').addEventListener('click', () => {
-    if (!saveNow()) { notify('保存失败：浏览器本地存储不可用或已写满。', true); return; }
-    notify('当前路线、回放参数与变速设置已保存在此浏览器，下次打开会自动恢复。');
+    try {
+      const route = settings(false);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({version: 1, savedAt: new Date().toISOString(), route}));
+      notify('当前路线与回放参数已保存在此浏览器，可通过“读取上次方案”恢复。');
+    } catch (error) { notify(`保存失败：${error.message}`, true); }
   });
   $('load-button').addEventListener('click', () => {
     if (editingLocked()) return;
-    try { loadStoredPlan(); } catch (error) { notify(error.message, true); }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) throw new Error('此浏览器尚未保存路线。');
+      const saved = JSON.parse(raw);
+      if (saved.version !== 1 || !saved.route) throw new Error('保存的方案格式不受支持。');
+      const restored = validatePoints(saved.route.points);
+      const speed = Number(saved.route.speed);
+      const loops = Number(saved.route.loops);
+      if (!Number.isFinite(speed) || speed < 0.2 || speed > 20 || !Number.isInteger(loops) || loops < 0 || loops > 10000) throw new Error('保存的回放参数无效。');
+      points = restored;
+      $('speed').value = speed;
+      $('loop-mode').value = loops === 0 ? 'infinite' : 'finite';
+      $('loops').value = loops || 1;
+      changeCount++;
+      renderRoute(true);
+      notify('已恢复上次保存的路线与回放参数。');
+    } catch (error) { notify(error.message, true); }
   });
   $('reset-settings-button').addEventListener('click', () => {
     if (!window.confirm('恢复默认回放参数？当前路线会保留。')) return;
