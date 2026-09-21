@@ -4,6 +4,8 @@
 
 在高德地图上规划路线，按速度与循环设置回放位置。提供 Windows 桌面版、Android 独立版，并支持 MuMu、Android USB 与 iPhone USB 连接。
 
+在线下载页（GitHub Pages）：<https://chanray-may9.github.io/campus-route-studio/> —— 该页面**只提供下载入口**。设备回放需要本机后端、ADB/MuMu 命令以及 Apple 移动设备服务，浏览器无法访问，所以本项目没有在线版；请下载桌面版使用完整功能。
+
 ## 先看使用流程
 
 | Windows 桌面版 | Android 独立版 |
@@ -15,7 +17,7 @@
 1. 打开 [Releases](https://github.com/Chanray-May9/campus-route-studio/releases/latest)，下载 `CampusRouteStudio-Windows.zip`。
 2. 解压到普通文件夹，双击 `start.cmd`。浏览器会自动打开本机工作台。
 3. 在地图上点击添加路径点，也可以拖动点位、导入 GPX/GeoJSON，或用“一键定位”找到学校附近。
-4. 设置基础速度、变速方式、左右摆幅、指定圈数或无限循环。先选“仅在地图预览”检查路线。
+4. 设置基础速度、变速方式、左右摆幅、指定圈数或无限循环。这些参数**改完会自动保存在此浏览器**，下次打开自动恢复，也可以用「恢复默认参数」一键还原。先选“仅在地图预览”检查路线。
 5. 需要连接设备时，在右侧选择 Android、MuMu 或 iOS，按对应步骤连接，再开始回放。
 6. 用“停止并退出”结束后台服务；只关闭浏览器标签页不会退出。
 

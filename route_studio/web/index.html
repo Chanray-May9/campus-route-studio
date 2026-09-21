@@ -53,7 +53,8 @@
         <div class="section-label"><h2>路线文件</h2><span class="tiny-muted">WGS84 坐标</span></div>
         <div class="file-tools"><button class="secondary-button" id="import-button">导入路线</button><div class="export-combo"><select id="export-format" aria-label="导出文件格式"><option value="gpx">GPX</option><option value="geojson">GeoJSON</option></select><button id="export-button" class="secondary-button">导出</button></div></div>
         <input id="import-file" type="file" accept=".gpx,.geojson,.json,application/gpx+xml,application/geo+json,application/json" hidden>
-        <div class="save-tools"><button class="text-button" id="save-button">保存到本机</button><button class="text-button" id="load-button">读取上次方案</button></div>
+        <div class="save-tools"><button class="text-button" id="save-button">保存到本机</button><button class="text-button" id="load-button">读取上次方案</button><button class="text-button" id="reset-settings-button">恢复默认参数</button></div>
+        <p class="field-hint" id="autosave-status" role="status">速度、变速模式、圈数与设备选项会自动保存在此浏览器，下次打开自动恢复。</p>
         <div class="section-divider"></div>
         <div class="section-label"><h2>我的轨迹库</h2><button id="library-refresh" class="text-button" type="button">刷新</button></div>
         <label class="library-label">轨迹名称<input id="library-name" maxlength="80" placeholder="例如：学校操场三圈"></label>
