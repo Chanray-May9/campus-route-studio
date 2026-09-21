@@ -21,7 +21,7 @@
 5. 需要连接设备时，在右侧选择 Android、MuMu 或 iOS，按对应步骤连接，再开始回放。
 6. 用“停止并退出”结束后台服务；只关闭浏览器标签页不会退出。
 
-### Android：手机独立运行
+### Android：手机独立运行（目前无法使用）
 
 1. 从 [Releases](https://github.com/Chanray-May9/campus-route-studio/releases/latest) 下载 `CampusRoute-Mobile.apk` 并安装。系统要求 Android 8 或更高版本。
 2. 打开系统“开发者选项” → “选择模拟位置信息应用”，选择“校园路线”。
