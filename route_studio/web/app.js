@@ -8,6 +8,8 @@
   const SCHOOL_KEY = 'campus-route-studio:school:v1';
   // 自动保存的完整方案：路线 + 回放参数 + 变速参数 + 设备选项。
   const AUTO_KEY = 'campus-route-studio:settings:v2';
+  // 只有“连续输入”（数字框敲键、拖动）才需要防抖把突发合并成一次写盘；
+  // 下拉框、复选框、按钮、路线增删等离散操作一律立即写盘，不等这个延迟。
   const AUTO_SAVE_DELAY = 250;
   let libraryEntries = [];
   let libraryBusy = false;
@@ -213,6 +215,11 @@
     return true;
   }
 
+  function saveNow() {
+    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
+    return writeSettings();
+  }
+
   function scheduleSave() {
     if (autoSaveTimer) clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => { autoSaveTimer = null; writeSettings(); }, AUTO_SAVE_DELAY);
@@ -314,7 +321,7 @@
   });
   $('follow-button').addEventListener('click', () => {
     setFollow(!followPlayback);
-    scheduleSave();
+    saveNow();
     if (followPlayback && map && run.point) { const p = toMap(run.point); map.setView([p.lat, p.lon], Math.max(18, map.getZoom())); }
   });
 
@@ -565,7 +572,8 @@
     });
     drawRoute(fit);
     updateEstimates();
-    scheduleSave();
+    // 路线的增删、导入、载入、拖动结束都是一次性操作，直接落盘。
+    saveNow();
   }
 
   function addPoint(point, fit = false) {
@@ -813,9 +821,10 @@
   $('mode').addEventListener('change', modeChanged);
   $('android-device').addEventListener('change', updateControls);
   document.querySelectorAll('.refresh-button').forEach(button => button.addEventListener('click', refreshDevices));
-  // 速度、变速模式、圈数、摆动与设备选项改动后自动保存。
+  // 连续输入：合并成一次写入，避免每敲一个键就把整条路线序列化一遍。
   ['speed', 'loops', 'motion-low', 'motion-high', 'motion-period', 'motion-sway', 'motion-sway-period', 'live-speed', 'manager', 'instance', 'adb-address'].forEach(id => $(id).addEventListener('input', scheduleSave));
-  ['loop-mode', 'motion-mode', 'export-format', 'sensor'].forEach(id => $(id).addEventListener('change', scheduleSave));
+  // 离散操作：改完立即写盘，不等防抖。
+  ['loop-mode', 'motion-mode', 'export-format', 'sensor'].forEach(id => $(id).addEventListener('change', saveNow));
   window.addEventListener('pagehide', flushSave);
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
   $('setup-button').addEventListener('click', () => action(async () => {
@@ -918,8 +927,7 @@
   }
 
   $('save-button').addEventListener('click', () => {
-    if (autoSaveTimer) { clearTimeout(autoSaveTimer); autoSaveTimer = null; }
-    if (!writeSettings()) { notify('保存失败：浏览器本地存储不可用或已写满。', true); return; }
+    if (!saveNow()) { notify('保存失败：浏览器本地存储不可用或已写满。', true); return; }
     notify('当前路线、回放参数与变速设置已保存在此浏览器，下次打开会自动恢复。');
   });
   $('load-button').addEventListener('click', () => {
@@ -933,7 +941,7 @@
     $('sensor').checked = false;
     updateEstimates();
     updateControls();
-    scheduleSave();
+    saveNow();
     notify('回放参数已恢复默认值。');
   });
   $('help-button').addEventListener('click', () => $('help-dialog').showModal());
