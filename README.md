@@ -6,7 +6,7 @@
 
 在线下载页（GitHub Pages）：<https://chanray-may9.github.io/campus-route-studio/> —— 该页面**只提供下载入口**。设备回放需要本机后端、ADB/MuMu 命令以及 Apple 移动设备服务，浏览器无法访问，所以本项目没有在线版；请下载桌面版使用完整功能。
 
-## 先看使用流程
+## 使用流程
 
 | Windows 桌面版 | Android 独立版 |
 | --- | --- |
@@ -40,6 +40,7 @@
 4. 回到工作台开始回放。若启动失败，先在设备上打开助手，授予权限并点击“启动位置回放服务”。
 
 MuMu 的 ADB 地址和端口以实例设置为准。也可以选择“MuMu（管理器定位）”，填写 `MuMuManager.exe` 路径和实例编号。
+不建议使用模拟器
 
 ### Windows 连接 iPhone
 
