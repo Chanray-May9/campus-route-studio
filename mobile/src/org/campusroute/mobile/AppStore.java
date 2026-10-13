@@ -27,17 +27,17 @@ public final class AppStore {
         bundled.put("updated",System.currentTimeMillis());
         for(int i=0;i<previous.length();i++){JSONObject entry=previous.getJSONObject(i);if(id.equals(entry.optString("id"))){next.put(bundled);replaced=true;}else next.put(entry);}
         if(!replaced)next.put(bundled);
-        if(!prefs.edit().putString("library",next.toString()).putInt("default_route_version",version).commit())throw new IllegalStateException("默认轨迹保存失败");
+        if(!prefs.edit().putString("library",next.toString()).putInt("default_route_version",version).commit())throw new IllegalStateException("默认路线保存失败");
     }
     public JSONArray library() throws Exception {return new JSONArray(prefs.getString("library","[]"));}
     public JSONObject save(JSONObject data) throws Exception {
-        String name=data.optString("name").trim();if(name.isEmpty()||name.length()>80)throw new IllegalArgumentException("轨迹名称需要 1–80 个字符");
+        String name=data.optString("name").trim();if(name.isEmpty()||name.length()>80)throw new IllegalArgumentException("路线名称需要 1–80 个字符");
         new RouteEngine(data.getJSONObject("route"),data.optJSONObject("motion"));
         JSONArray list=library();String id=data.optString("id");boolean updated=false;
         if(id.isEmpty())id=java.util.UUID.randomUUID().toString();
         JSONObject entry=new JSONObject(data.toString()).put("id",id).put("updated",System.currentTimeMillis());
         for(int i=0;i<list.length();i++)if(id.equals(list.getJSONObject(i).optString("id"))){list.put(i,entry);updated=true;break;}
-        if(!updated){if(list.length()>=100)throw new IllegalArgumentException("最多保存 100 条轨迹");list.put(entry);}
+        if(!updated){if(list.length()>=100)throw new IllegalArgumentException("最多保存 100 条路线");list.put(entry);}
         if(!prefs.edit().putString("library",list.toString()).commit())throw new IllegalStateException("保存失败");
         return entry;
     }

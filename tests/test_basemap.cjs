@@ -1,0 +1,30 @@
+const {chromium}=require('playwright');
+const fs=require('node:fs');const path=require('node:path');const assert=require('node:assert/strict');
+(async()=>{
+  const browser=await chromium.launch({headless:true});const page=await browser.newPage();
+  const root=path.resolve(__dirname,'..');
+  assert.equal(fs.readFileSync(path.join(root,'mobile/assets/basemap.js'),'utf8'),fs.readFileSync(path.join(root,'route_studio/web/basemap.js'),'utf8'));
+  const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aTYQAAAAASUVORK5CYII=','base64');
+  await page.route('https://*.is.autonavi.com/**',r=>r.fulfill({body:pixel,contentType:'image/png'}));
+  await page.setContent('<div id="map" style="width:400px;height:400px"></div>');
+  await page.addStyleTag({path:path.join(root,'mobile/assets/vendor/leaflet.css')});
+  await page.addScriptTag({path:path.join(root,'mobile/assets/vendor/leaflet.js')});
+  await page.addScriptTag({path:path.join(root,'mobile/assets/basemap.js')});
+  await page.evaluate(()=>{
+    window.map=L.map('map').setView([29.5,106.7],16);window.fallbacks=[];
+    window.layers=CampusBasemap.attach(map,{onFallback:message=>fallbacks.push(message)});
+    window.route=L.polyline([[29.5,106.7],[29.501,106.701]]).addTo(map);
+  });
+  assert.equal(await page.evaluate(()=>map.hasLayer(layers.imagery)),true);
+  assert.equal(await page.evaluate(()=>map.hasLayer(layers.streets)),false);
+  const before=await page.evaluate(()=>route.getLatLngs());
+  await page.locator('.leaflet-control-layers label').filter({hasText:'普通地图'}).click();
+  assert.equal(await page.evaluate(()=>map.hasLayer(layers.streets)),true);
+  assert.deepEqual(await page.evaluate(()=>route.getLatLngs()),before);
+  await page.locator('.leaflet-control-layers label').filter({hasText:'卫星地图'}).click();
+  await page.evaluate(()=>{layers.satellite.fire('loading');for(let i=0;i<3;i++)layers.satellite.fire('tileerror');});
+  assert.equal(await page.evaluate(()=>map.hasLayer(layers.streets)),true);
+  assert.match(await page.evaluate(()=>fallbacks.at(-1)),/已切换为普通地图/);
+  assert.deepEqual(await page.evaluate(()=>route.getLatLngs()),before);
+  await browser.close();console.log('PASS: AMap satellite default, street switch, automatic fallback, and route preservation for both apps. Tile images are test fixtures.');
+})().catch(e=>{console.error(e);process.exit(1)});

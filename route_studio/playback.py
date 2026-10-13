@@ -37,7 +37,7 @@ class Playback:
             if self.shutdown_requested:
                 raise ValueError("程序正在退出")
             if self.thread and self.thread.is_alive():
-                raise ValueError("已有回放任务，请先停止并等待清理完成")
+                raise ValueError("已有跑步任务，请先停止并等待清理完成")
             adapter = self.factory(config)
             self.stop_requested = False
             self.pause_requested = False
@@ -58,7 +58,7 @@ class Playback:
         motion = Motion(data)
         with self.condition:
             if self.data['state'] not in ('running', 'paused', 'starting'):
-                raise ValueError('请先开始回放后再应用实时参数')
+                raise ValueError('请先开始跑步后再应用实时参数')
             self.motion = motion
             self.data['motion'] = motion.as_dict()
             self.condition.notify_all()

@@ -152,7 +152,7 @@ class PlaybackTests(unittest.TestCase):
         config = {"route": {"points": POINTS}, "mode": "preview"}
         worker.start(config)
         self.assertTrue(entered.wait(timeout=1))
-        with self.assertRaisesRegex(ValueError, "已有回放"):
+        with self.assertRaisesRegex(ValueError, "已有跑步"):
             worker.start(config)
         worker.control("stop")
         release.set()

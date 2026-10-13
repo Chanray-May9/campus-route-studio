@@ -29,20 +29,20 @@ public final class MainActivity extends Activity {
         column.setOrientation(LinearLayout.VERTICAL);
         column.setPadding(pad, pad * 2, pad, pad * 2);
         column.setBackgroundColor(Color.rgb(246, 248, 246));
-        TextView title = text("Route Studio Helper", 26);
+        TextView title = text("校园乐跑定位助手", 26);
         title.setTextColor(Color.rgb(21, 80, 61));
         column.addView(title);
-        column.addView(text("Android 位置回放连接器", 18));
+        column.addView(text("Android 跑步定位连接器", 18));
         column.addView(text("1. 开启手机定位，授予本工具定位权限。\n\n"
-            + "2. 开发者选项 → 选择模拟位置信息应用 → Route Studio Helper。\n\n"
+            + "2. 开发者选项 → 选择模拟位置信息应用 → 校园乐跑定位助手。\n\n"
             + "3. USB 调试连接电脑，并在手机确认电脑授权。\n\n"
-            + "4. 回到电脑选择设备并开始回放。如系统限制后台启动，先在此点击启动，再于 10 秒内开始电脑回放。", 16));
+            + "4. 回到电脑选择设备并开始跑步。如系统限制后台启动，先在此点击启动，再于 10 秒内开始电脑跑步。", 16));
         column.addView(button("授予定位和通知权限", view -> requestAccess()));
         column.addView(button("打开开发者选项", view -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)));
         column.addView(button("应用权限设置", view -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.parse("package:" + getPackageName())))));
         column.addView(text("后台启动可能需要在应用权限中允许“始终访问位置”。也可保持此页面可见并手动启动。本工具不会自动修改模拟位置应用授权。", 14));
-        column.addView(button("启动位置回放服务", view -> startReplay()));
+        column.addView(button("启动跑步定位服务", view -> startReplay()));
         column.addView(button("停止并移除模拟位置", view -> {
             try { MockLocationService.stopSession(this); status.setText("已停止，并移除测试位置提供器。"); }
             catch (Exception error) { status.setText(CommandReceiver.message(error)); }
@@ -60,7 +60,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onResume() {
         super.onResume();
-        if (status != null) status.setText(MockLocationService.isRunning() ? "回放服务运行中" : "服务未运行");
+        if (status != null) status.setText(MockLocationService.isRunning() ? "跑步服务运行中" : "服务未运行");
     }
 
     private TextView text(String value, int size) {

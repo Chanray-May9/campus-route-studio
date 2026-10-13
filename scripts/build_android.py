@@ -91,8 +91,13 @@ def main() -> None:
              "--lib", platform, "--output", dex, *sorted(classes.rglob("*.class"))])
         unsigned = temporary / "unsigned.apk"
         asset_args = ['-A', source / 'assets'] if (source / 'assets').is_dir() else []
+        resource_args = []
+        if (source / 'res').is_dir():
+            compiled = temporary / 'resources.zip'
+            run([tools / ('aapt2' + suffix), 'compile', '--dir', source / 'res', '-o', compiled])
+            resource_args = ['-R', compiled]
         run([tools / ("aapt2" + suffix), "link", "-I", platform, "--manifest", source / "AndroidManifest.xml", *asset_args,
-             "--min-sdk-version", "26", "--target-sdk-version", "35", "-o", unsigned])
+             *resource_args, "--min-sdk-version", "26", "--target-sdk-version", "35", "-o", unsigned])
         with zipfile.ZipFile(unsigned, "a", compression=zipfile.ZIP_DEFLATED) as archive:
             for dex_file in sorted(dex.glob("*.dex")):
                 archive.write(dex_file, dex_file.name)

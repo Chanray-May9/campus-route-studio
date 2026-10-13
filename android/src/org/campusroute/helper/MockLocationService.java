@@ -97,7 +97,7 @@ public final class MockLocationService extends Service {
         AppOpsManager appOps = getSystemService(AppOpsManager.class);
         if (appOps.checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, Process.myUid(), getPackageName())
             != AppOpsManager.MODE_ALLOWED) {
-            throw new SecurityException("Select Route Studio Helper as the mock-location app in Developer options");
+            throw new SecurityException("Select 校园乐跑定位助手 as the mock-location app in Developer options");
         }
         if (Build.VERSION.SDK_INT >= 28 && !locations.isLocationEnabled()) {
             throw new IllegalStateException("Enable the device Location setting");
@@ -126,14 +126,14 @@ public final class MockLocationService extends Service {
 
     private void showNotification() {
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "位置回放", NotificationManager.IMPORTANCE_LOW));
+        manager.createNotificationChannel(new NotificationChannel(CHANNEL, "跑步定位", NotificationManager.IMPORTANCE_LOW));
         PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent stop = PendingIntent.getBroadcast(this, 1,
             new Intent(this, CommandReceiver.class).putExtra("action", "stop"),
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         Notification notification = new Notification.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setContentTitle("Route Studio · 模拟位置回放")
+            .setContentTitle("Route Studio · 模拟跑步定位")
             .setContentText("10 秒未收到坐标将自动停止；点击停止可恢复位置提供器。")
             .setContentIntent(open).setOngoing(true)
             .addAction(new Notification.Action.Builder(null, "停止", stop).build())
@@ -188,6 +188,9 @@ public final class MockLocationService extends Service {
                     location.setSpeedAccuracyMetersPerSecond(.25f);
                     location.setBearingAccuracyDegrees(3f);
                     location.setVerticalAccuracyMeters(5f);
+                }
+                if(LocationManager.GPS_PROVIDER.equals(provider)){
+                    Bundle quality=new Bundle();quality.putInt("satellites",12);location.setExtras(quality);
                 }
                 service.locations.setTestProviderLocation(provider, location);
             }

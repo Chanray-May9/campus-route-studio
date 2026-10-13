@@ -1,111 +1,110 @@
-# 校园乐跑辅助工具
+# 校园乐跑助手
 
-你是否厌倦了校园乐跑，你是否厌倦了繁琐的形式主义，锐锐的这个乐跑工具可以让您足不出户完成乐跑任务！嘻嘻嘻，锐锐爱你们哦~ 喵喵喵~ 哦吼吼吼~~~
+在高德地图上选择校园跑步路线，设置距离、配速和圈数，再开始跑步定位。
+提供 Windows 安装版和 Android 版。地图默认使用**高德卫星影像 + 高德道路标注**，
+可切换为高德普通地图；卫星瓦片不可用时自动回退。
 
-很抱歉安卓版本（包括模拟器）目前存在无法定位的bug，具体表现为启动辅助软件之后乐跑软件上面定位虽然发生更新但没有出现移动，但我们仍然保留了安卓版本的安装包但是安装之后可能无法正常使用，我们对用户造成的不便表达十分歉意，如果您有解决方法欢迎Issues或Fork。   通过电脑端数据线连接手机仍然可以正常使用。
+**[下载最新版本](https://github.com/Chanray-May9/campus-route-studio/releases/latest)** ·
+[下载页](https://chanray-may9.github.io/campus-route-studio/)
 
-在高德地图上规划路线，按速度与循环设置回放位置。提供 Windows 桌面版、Android 独立版，并支持 MuMu、Android USB 与 iPhone USB 连接。
+## Windows：安装后直接使用
 
-在线下载页（GitHub Pages）：<https://chanray-may9.github.io/campus-route-studio/> —— 该页面**只提供下载入口**。设备回放需要本机后端、ADB/MuMu 命令以及 Apple 移动设备服务，浏览器无法访问，所以本项目没有在线版；请下载桌面版使用完整功能。
+1. 下载 `CampusRouteStudio-Windows-Setup-0.6.0.exe`，按中文向导安装。
+2. 打开桌面或开始菜单里的“校园乐跑助手”，浏览器自动打开本机界面。
+3. 选择校园路线，设置速度和圈数。先使用“仅在地图预览”检查路线。
+4. MuMu 用户选择“MuMu（管理器定位）”，点击“查找本机 MuMu”并确认实例。
+   开始跑步后，在乐跑里确认位置变化，再开始乐跑的跑步记录。
+5. 结束时点击“结束并退出”。关闭浏览器标签页不会退出本机程序。
 
-## 使用流程
+安装包内置 Python、ADB、Android 定位助手和 iOS 连接依赖，**不需要安装 Python、
+JDK 或 Android SDK，也不需要配置 PATH**。支持 Windows 10/11 x64，按当前用户安装，
+不要求管理员权限。系统“已安装的应用”中可以卸载；保存的路线留在当前用户的本地数据目录。
 
-| Windows 桌面版 | Android 独立版 |
-| --- | --- |
-| ![Windows 桌面版](docs/images/windows-workflow.png) | ![Android 独立版](docs/images/android-workflow.png) |
+也提供免安装 `CampusRouteStudio-Windows.zip`，解压后打开 `CampusRouteStudio.exe`。
+此 ZIP 同样包含运行环境。源代码请下载 `CampusRoute-Source.zip`。
 
-### Windows：下载后直接运行
+![Windows 界面](docs/images/windows-workflow.png)
 
-1. 打开 [Releases](https://github.com/Chanray-May9/campus-route-studio/releases/latest)，下载 `CampusRouteStudio-Windows.zip`。
-2. 解压到普通文件夹，双击 `start.cmd`。浏览器会自动打开本机工作台。
-3. 在地图上点击添加路径点，也可以拖动点位、导入 GPX/GeoJSON，或用“一键定位”找到学校附近。
-4. 设置基础速度、变速方式、左右摆幅、指定圈数或无限循环。这些参数**改完会自动保存在此浏览器**，下次打开自动恢复，也可以用「恢复默认参数」一键还原。先选“仅在地图预览”检查路线。
-5. 需要连接设备时，在右侧选择 Android、MuMu 或 iOS，按对应步骤连接，再开始回放。
-6. 用“停止并退出”结束后台服务；只关闭浏览器标签页不会退出。
+## Android：手机独立使用
 
-### Android：手机独立运行（目前无法使用）
+安卓版面向真实 Android 8+ 手机，路线计算和 GPS/network 定位发送都在手机内完成，
+**无需 Windows、电脑配对或 MuMu**。首次使用授予精确位置权限、打开系统定位，
+在开发者选项的“选择模拟位置信息应用”中选择“校园乐跑助手”。
+切换到其他 App 后由前台定位服务持续运行；若厂商限制后台运行，在应用设置中解除电池限制。
 
-1. 从 [Releases](https://github.com/Chanray-May9/campus-route-studio/releases/latest) 下载 `CampusRoute-Mobile.apk` 并安装。系统要求 Android 8 或更高版本。
-2. 打开系统“开发者选项” → “选择模拟位置信息应用”，选择“校园路线”。
-3. 回到 App，授予精确位置权限，并确认系统定位开关已打开。
-4. 在高德地图上规划路线，设置速度、摆动和循环次数；也可以从轨迹库载入已有路线。
-5. 勾选场地确认后开始回放。状态行会显示实际启用的 `gps` / `network` 提供器和已发送次数。
-6. 回放期间可以切换到其他 App；从通知栏或 App 内停止。若后台被系统结束，请允许“校园路线”后台运行。
+本次调整了后台工作线程、启动确认、时间戳、前台服务和有超时保护的唤醒锁，保留系统原生融合定位，
+并展示系统实际回调和移动距离。详细设置见 [MOBILE_SETUP.md](MOBILE_SETUP.md)。
 
-学校要求只能在操场跑时，请按实际操场边界准确规划并自行核对学校规定。目标软件可能识别 Android 模拟位置或采用额外的运动数据校验，本项目不能保证目标软件接受记录。
+本次修复 GPS 数据缺少传统卫星数量元数据导致目标应用不采用后续坐标的问题。
+在 MuMu安卓设备-1 上使用**同一个手机 APK 的 GPS/network 模拟定位链路**，
+步道乐跑 4.2.6 自由跑里程持续增加，暂停、继续和熄屏运行通过；正式 APK 也单独验证通过。
+这些测试没有调用 MuMu 管理器定位、没有 Windows 桥，也没有使用 Root。
+真实手机尚未实测，不能把单一设备验证当成所有手机或所有目标应用都兼容。
+详细数据见 [VALIDATION.md](VALIDATION.md)。
 
-### Windows 连接 Android 或 MuMu
+![Android 实机界面（MuMu 测试设备）](docs/images/android-workflow.png)
 
-1. 手机打开 USB 调试并确认电脑授权；MuMu 请在设置中打开 ADB 调试。
-2. 桌面版选择“Android / MuMu（ADB）”，刷新设备并选中目标设备。
-3. 点击“安装定位助手并打开设置”。在设备开发者选项里把 `Route Studio Helper` 设为模拟位置应用。
-4. 回到工作台开始回放。若启动失败，先在设备上打开助手，授予权限并点击“启动位置回放服务”。
+## Windows 连接其他设备
 
-MuMu 的 ADB 地址和端口以实例设置为准。也可以选择“MuMu（管理器定位）”，填写 `MuMuManager.exe` 路径和实例编号。
-不建议使用模拟器
+- Android USB：开启 USB 调试、确认电脑授权，安装内置“校园乐跑定位助手”，按手机引导
+  授予权限并选择模拟位置应用。目标软件是否采用模拟位置需在设备上核对。
+- iPhone USB：需要 Apple 设备驱动、解锁并信任电脑，以及系统要求的开发者模式和服务。
+  安装包已内置 Python 连接库，但 Apple 驱动和手机系统设置仍需完成。此次未测试真实 iPhone。
+- Android 官方模拟器：支持模拟器定位，提供可选运动传感器模拟。
 
-### Windows 连接 iPhone
+## 坐标与偏移
 
-1. 用数据线连接 iPhone，解锁后选择“信任此电脑”，并安装 Apple 设备驱动。
-2. 打开 iPhone 开发者模式；首次连接可能需要准备匹配系统版本的开发者服务文件。
-3. 桌面版选择“iPhone / iPad（USB）”，刷新并选中设备，再开始回放。
-4. iOS 17.0–17.3.1 在 Windows 上需要管理员权限运行 `pymobiledevice3 remote tunneld`；iOS 17.4 及以上由程序尝试建立 userspace tunnel。
+路线、导入导出文件和内部计算统一使用 **WGS84**；高德普通地图和卫星地图均按
+**GCJ-02** 显示。地图点击时转回 WGS84，显示时转成 GCJ-02，路线数据不会反复偏移。
 
-## 主要功能
+MuMu 的管理器定位命令按 **BD-09** 解释输入。仅在这一输出接口进行转换，并补偿
+MuMu 内部近似反算造成的米级误差。BD-09 不是本项目的地图基座，两端地图均使用高德。
 
-- 高德国内底图；地图按 GCJ-02 显示，路线文件和设备回放保持 WGS84。
-- 地图点击、拖动、撤销、闭合、一键定位和学校位置保存。
-- 导入 GPX、GeoJSON、JSON，导出 GPX 与 GeoJSON。
-- 本地轨迹库；Android 版也可同步维护者发布的公共轨迹。
-- 内置“重庆建筑工程职业学院东站校区操场”默认轨迹，单圈约 485 米。
-- 固定速度、平滑变速、突然快慢变化、轨迹左右摆动。
-- 指定圈数与无限循环；运行中可调整速度和摆动参数。
-- Windows 支持 Android/MuMu、MuMu 管理器、iOS USB 与 Android 官方模拟器。
+MuMu 15 的原生定位最终保存为 32 位浮点坐标，存在约数十厘米的舍入误差和小幅定位抖动，
+不能承诺每个小数位完全相等。这个限制仅针对 Windows 的 MuMu 输出，不是手机端的坐标转换。
+手机定位直接使用 WGS84，不经过百度坐标；地图优先显示近期系统实际反馈的坐标。
+验证脚本读取真实 Android GPS，并分别记录与原始坐标、可表示浮点坐标的偏差；
+结果见 [本次验证说明](VALIDATION.md)。底图影像本身的测绘精度不等于定位数值精度。
 
-## 常见问题
+## 路线功能
 
-#### 安卓提示没有模拟位置权限
-确认开发者选项里选择的是当前使用的 App：手机独立版选“校园路线”，桌面版连接手机时选 `Route Studio Helper`。两个 App 不能同时成为模拟位置应用。还要授予精确位置权限并打开系统定位。
+- 地图点选、拖动调整、连接首尾、坐标输入；切换底图保留路线。
+- 导入 GPX、GeoJSON、JSON；路线库、备份导出。
+- 内置重庆建筑工程职业学院东站校区操场路线；请自行核对实际跑道边界。
+- 固定速度、平缓变速、交替变速、左右偏移、指定圈数或持续跑步。
+- 安卓推荐设置默认目标 3.2 公里、6 分钟/公里，自动计算完整圈数。
+- 运行中调整速度、暂停、继续、结束；后台定位发送与实际系统反馈分别展示。
 
-#### 状态显示在移动，但另一个 App 不动
-先打开系统地图核对位置。新版会分别注册 GPS 和网络提供器，只要一个可用就继续，并在状态里显示实际提供器。部分 App 使用自己的定位缓存或检测模拟位置，可尝试强制停止目标 App 后重新打开。
+学校的场地、打卡点、距离、配速、有效时段和记录次数要求以学校及乐跑实际规定为准。
+应用内展示的是规则参考，工具不读取随机打卡点或学生成绩判定。
 
-#### 地图空白
-检查能否访问 `webrd01.is.autonavi.com`。底图需要网络；路线编辑、坐标输入、导入和设备回放本身不依赖地图瓦片。
+## 开发与构建
 
-#### Windows 没检测到手机
-Android 请检查 USB 调试授权和 ADB 驱动；iPhone 请保持解锁、确认信任，并检查 Apple Mobile Device 驱动。换一条支持数据传输的线和 USB 端口通常也有帮助。
-
-## 技术说明
-
-路线统一保存为 WGS84。高德底图采用 GCJ-02，因此前端只在绘制与地图交互时转换坐标：显示前执行 WGS84 → GCJ-02，点击或拖动后执行 GCJ-02 → WGS84。发给 Android、MuMu 和 iOS 的坐标不会经过地图坐标偏移。
-
-| 模式 | 定位实现 | 运动传感器 |
-| --- | --- | --- |
-| 地图预览 | 本机插值计算 | 不发送 |
-| Android USB / MuMu ADB | Android GPS/network 测试提供器 | 真机不提供通用传感器注入 |
-| MuMu 管理器 | MuMuManager 定位命令 | 不发送 |
-| iOS USB | Apple 开发者定位服务 / DVT tunnel | 不发送 |
-| Android 官方模拟器 | Emulator console geo fix | 可选回放加速度 |
-
-Android 坐标带有系统的 mock 标记。助手收到更新时会重置 10 秒看门狗；电脑断开且服务仍存活时会尝试移除测试提供器。普通 Android 没有面向第三方 App 的通用加速度、陀螺仪或计步器注入接口。
-
-### 本地开发
-
-需要 Python 3.11 及以上版本：
+使用 Python 3.12 x64、Node.js、JDK 17+、Android SDK 35+。开发环境与终端用户安装无关。
 
 ```powershell
-py -3.12 -m unittest discover -s tests -v
-py -3.12 launch.py
+python -m unittest discover -s tests -v
+node --test tests/test_run_rules.cjs
+node tests/test_coordinates.cjs
+node tests/test_basemap.cjs
+node tests/test_mobile_ui.cjs  # 需要 Playwright
+python scripts/build_android.py --source-dir mobile --apk-name CampusRoute-Mobile.apk
+python scripts/build_android.py
+python -m pip install pyinstaller==6.20.0 -r requirements-ios.txt
+python scripts/build_windows.py --iscc "C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
+python scripts/package_release.py --output dist/release --android-build build --windows-build dist
 ```
 
-构建 Android APK 需要 JDK 17、Android SDK Platform 35 和 Build Tools 35：
+定位测试（必须指定专用测试设备；系统定位测试不能证明乐跑兼容性）：
 
 ```powershell
-py -3.12 scripts/build_android.py --source-dir mobile --apk-name CampusRoute-Mobile.apk
-py -3.12 scripts/build_android.py
+python scripts/test_android_replay.py --serial 127.0.0.1:16416
+python scripts/test_android_replay.py --build-only
+python scripts/test_android_coordinates.py --serial 127.0.0.1:16416 --manager "D:/Program Files/Netease/MuMu/nx_main/MuMuManager.exe" --instance 1
 ```
 
-`cloudflare/` 提供 Workers + D1 公共轨迹服务。公开读取接口为 `GET /api/routes`，管理接口使用 `CR_ADMIN_TOKEN`，部署步骤见 [Cloudflare 说明](cloudflare/README.md)。
+安卓覆盖更新须使用相同签名，构建时保留原有 `build/android-helper-debug.keystore`。
+新电脑生成的开发密钥与既有 APK 不同，会导致系统拒绝覆盖安装；请先备份本地路线。
+密钥不得上传或分发。公共路线服务说明见 [cloudflare/README.md](cloudflare/README.md)。
 
-项目采用 [GPL-3.0-or-later](LICENSE) 许可证。第三方组件与许可见 [NOTICE](NOTICE)。
+许可证：[GPL-3.0-or-later](LICENSE)；第三方许可：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -37,3 +37,5 @@
 #library-select {margin-top:12px;}
 .library-actions {display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
 .library-actions button {flex:1;padding:0 7px;}
+.leaflet-control-layers input {width:auto;height:auto;min-height:0;display:inline-block;padding:0;margin:0 5px 0 0;}
+.leaflet-control-layers label {display:flex;align-items:center;min-height:26px;margin:0;font-size:12px;}

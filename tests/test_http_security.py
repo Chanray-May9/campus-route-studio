@@ -2,6 +2,7 @@ import http.client
 import json
 import threading
 import unittest
+from unittest.mock import patch
 from route_studio.server import LocalServer
 
 
@@ -34,6 +35,12 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.request('GET', '/api/status', auth=False)[0], 403)
         self.assertEqual(self.request('GET', '/api/status')[0], 200)
         self.assertEqual(self.request('POST', '/api/control', '{}', origin=False)[0], 403)
+
+    def test_mumu_discovery_requires_authentication(self):
+        self.assertEqual(self.request("GET", "/api/mumu", auth=False)[0],403)
+        with patch("route_studio.mumu.discover_mumu",return_value={"managers":[],"errors":[]}):
+            status,body=self.request("GET", "/api/mumu")
+        self.assertEqual(status,200)
 
     def test_file_traversal_and_invalid_json(self):
         self.assertEqual(self.request('GET', '/../README.md')[0], 404)

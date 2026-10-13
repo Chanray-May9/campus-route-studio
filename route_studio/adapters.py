@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 from pathlib import Path
@@ -16,6 +17,9 @@ import time
 
 class DeviceError(RuntimeError):
     pass
+
+
+_adb_cache_lock = threading.Lock()
 
 
 def command(args, timeout=15):
@@ -34,6 +38,24 @@ def command(args, timeout=15):
 
 
 def adb_path():
+    # Prefer the packaged tools; no system SDK or PATH configuration is needed.
+    if getattr(sys, "frozen", False):
+        bundled = Path(sys._MEIPASS) / "platform-tools" / "adb.exe"
+        if bundled.is_file():
+            # ADB leaves a background server running. Run it from user data so
+            # that upgrading/uninstalling the app does not lock installed files.
+            fingerprint = hashlib.sha256()
+            for name in ('adb.exe', 'AdbWinApi.dll', 'AdbWinUsbApi.dll'):
+                component = bundled.parent / name
+                if not component.is_file():
+                    raise DeviceError('内置 ADB 组件不完整，请重新安装 Windows 版')
+                fingerprint.update(component.read_bytes())
+            cache = Path(os.environ['LOCALAPPDATA']) / 'CampusRouteStudio' / 'platform-tools' / fingerprint.hexdigest()[:16]
+            with _adb_cache_lock:
+                if not (cache / '.ready').is_file():
+                    shutil.copytree(bundled.parent, cache, dirs_exist_ok=True)
+                    (cache / '.ready').write_text('ready', encoding='ascii')
+            return str(cache / 'adb.exe')
     found = shutil.which("adb")
     if found:
         return found
@@ -43,7 +65,7 @@ def adb_path():
         path = Path(root) / "platform-tools" / ("adb.exe" if os.name == "nt" else "adb")
         if root and path.is_file():
             return str(path)
-    raise DeviceError("未找到 ADB。请安装 Android SDK Platform-Tools，并加入 PATH 或设置 ANDROID_HOME。")
+    raise DeviceError("ADB 文件缺失，请重新安装完整 Windows 安装包。源码开发需要 Android Platform-Tools。")
 
 
 def serial_value(value):
@@ -173,10 +195,12 @@ class MuMuAdapter:
             raise DeviceError("指定 MuMu 实例尚未启动 Android，请先在 MuMu 中打开它")
 
     def send(self, point):
+        from .coordinates import wgs_to_mumu
+        latitude, longitude = wgs_to_mumu(point['lat'], point['lon'])
         output = command([self.manager, "control", "-v", self.instance, "tool", "location",
-                          "-lon", f'{point["lon"]:.8f}', "-lat", f'{point["lat"]:.8f}'])
-        if re.search(r"error|failed|失败|错误", output, re.I):
-            raise DeviceError(output[-1000:])
+                          "-lon", f'{longitude:.8f}', "-lat", f'{latitude:.8f}'])
+        from .mumu import check_reply
+        check_reply(output)
         self.used = True
 
     def close(self):

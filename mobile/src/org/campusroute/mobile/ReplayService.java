@@ -7,81 +7,166 @@ import android.content.pm.PackageManager;
 import android.location.*;
 import android.os.*;
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.json.JSONObject;
 
+/** A single worker owns route timing, commands and device I/O, including in background. */
 public final class ReplayService extends Service {
-    static ReplayService instance;
+    static volatile ReplayService instance;
     static volatile String state="idle",error="",cleanupError="";
     static volatile JSONObject last=new JSONObject();
-    final Handler handler=new Handler(Looper.getMainLooper());
+    Handler handler;
+    HandlerThread worker;
     LocationManager locations;
-    AppStore store;
     RouteEngine engine;
     PowerManager.WakeLock wake;
-    long previous,sent;
-    final ArrayList<String> providers=new ArrayList<>();
-    final JSONObject providerErrors=new JSONObject();
+    long previous,sent,started,received,fusedReceived;
+    double receivedMovement;
+    Location observed;
+    final ArrayList<String> providers=new ArrayList<>(),ownedProviders=new ArrayList<>();
+    JSONObject providerErrors=new JSONObject();
+    final LocationListener observer=new LocationListener(){
+        @Override public void onLocationChanged(Location l){if(observed!=null)receivedMovement+=observed.distanceTo(l);observed=new Location(l);received++;}
+        @Override public void onProviderEnabled(String p){}
+        @Override public void onProviderDisabled(String p){}
+        @Override public void onStatusChanged(String p,int status,Bundle extras){}
+    };
+    final LocationListener fusedObserver=new LocationListener(){
+        @Override public void onLocationChanged(Location l){fusedReceived++;}
+        @Override public void onProviderEnabled(String p){}
+        @Override public void onProviderDisabled(String p){}
+        @Override public void onStatusChanged(String p,int status,Bundle extras){}
+    };
     public static boolean active(){return instance!=null&&(state.equals("running")||state.equals("paused")||state.equals("starting"));}
-    @Override public void onCreate(){super.onCreate();instance=this;locations=getSystemService(LocationManager.class);}
+    @Override public void onCreate(){
+        super.onCreate();instance=this;locations=getSystemService(LocationManager.class);
+        worker=new HandlerThread("campus-run");worker.start();handler=new Handler(worker.getLooper());
+    }
     @Override public int onStartCommand(Intent intent,int flags,int id){
-        if(intent!=null&&"stop".equals(intent.getStringExtra("action"))){stop("idle","");return START_NOT_STICKY;}
-        if(active()&&engine!=null)return START_NOT_STICKY;
-        state="starting";error="";cleanupError="";last=new JSONObject();sent=0;
-        try {
-            notifyRunning();store=new AppStore(this);
-            if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("请先授予精确位置权限");
-            if(getSystemService(AppOpsManager.class).checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION,android.os.Process.myUid(),getPackageName())!=AppOpsManager.MODE_ALLOWED)throw new SecurityException("请在开发者选项中选择“校园路线”为模拟位置应用");
-            if(Build.VERSION.SDK_INT>=28&&!locations.isLocationEnabled())throw new IllegalStateException("请开启手机定位服务");
-            JSONObject config=new JSONObject(intent.getStringExtra("config"));engine=new RouteEngine(config.getJSONObject("route"),config.optJSONObject("motion"));
-            registerProvider(LocationManager.GPS_PROVIDER);
-            registerProvider(LocationManager.NETWORK_PROVIDER);
-            if(providers.isEmpty())throw new IllegalStateException("GPS 和网络模拟提供器都无法启用："+providerErrors.toString());
-            wake=getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"campusroute:StandaloneReplay");wake.setReferenceCounted(false);wake.acquire(15000);
-            previous=SystemClock.elapsedRealtime();state="running";handler.post(tick);
-        }catch(Exception e){stop("error",message(e));}
+        if(intent!=null&&"stop".equals(intent.getStringExtra("action"))){handler.post(()->stop("idle",""));return START_NOT_STICKY;}
+        ResultReceiver reply=intent==null?null:intent.getParcelableExtra("reply");
+        if(active()){respond(reply,false,"已有跑步正在进行，请先结束");return START_NOT_STICKY;}
+        state="starting";error="";cleanupError="";last=new JSONObject();
+        try{
+            notifyRunning(); // Meet the foreground-service deadline before asynchronous I/O.
+            JSONObject config=new JSONObject(intent.getStringExtra("config"));
+            handler.post(()->startRun(config,reply));
+        }catch(Exception e){handler.post(()->{stop("error",message(e));respond(reply,false,message(e));});}
         return START_NOT_STICKY;
     }
-    final Runnable tick=new Runnable(){@Override public void run(){
-        try {
+    void startRun(JSONObject config,ResultReceiver reply){
+        sent=received=fusedReceived=0;receivedMovement=0;observed=null;providerErrors=new JSONObject();
+        try{
+            if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new SecurityException("请先授予精确位置权限");
+            if(Build.VERSION.SDK_INT>=28&&!locations.isLocationEnabled())throw new IllegalStateException("请开启手机定位服务");
+            engine=new RouteEngine(config.getJSONObject("route"),config.optJSONObject("motion"));
+            if(getSystemService(AppOpsManager.class).checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION,android.os.Process.myUid(),getPackageName())!=AppOpsManager.MODE_ALLOWED)throw new SecurityException("请在开发者选项中选择“校园乐跑助手”为模拟位置应用");
+            registerProvider(LocationManager.GPS_PROVIDER);registerProvider(LocationManager.NETWORK_PROVIDER);
+            if(providers.isEmpty())throw new IllegalStateException("GPS 和网络定位都无法启用："+providerErrors);
+            wake=getSystemService(PowerManager.class).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"campusroute:Run");wake.setReferenceCounted(false);wake.acquire(15000);
+            String provider=providers.contains("gps")?"gps":providers.get(0);
+            if(locations.getAllProviders().contains(provider))locations.requestLocationUpdates(provider,500,0,observer,worker.getLooper());
+            if(locations.getAllProviders().contains("fused")){
+                try{locations.requestLocationUpdates("fused",500,0,fusedObserver,worker.getLooper());}
+                catch(Exception e){providerErrors.put("fusedSubscription",message(e));}
+            }
+            started=previous=SystemClock.elapsedRealtime();sendPoint(started);
+            state="running";respond(reply,true,"");handler.postDelayed(tick,500);
+        }catch(Exception e){stop("error",message(e));respond(reply,false,message(e));}
+    }
+    final Runnable tick=()->{
+        try{
             long now=SystemClock.elapsedRealtime();double dt=(now-previous)/1000.0;previous=now;
-            engine.advance(dt,Double.POSITIVE_INFINITY);
-            JSONObject point=engine.point();long time=System.currentTimeMillis(),nanos=SystemClock.elapsedRealtimeNanos();
-            for(String provider:new ArrayList<>(providers)){Location l=new Location(provider);l.setLatitude(point.getDouble("lat"));l.setLongitude(point.getDouble("lon"));l.setAccuracy(5);l.setSpeed((float)point.getDouble("speed"));l.setBearing((float)point.getDouble("bearing"));l.setTime(time);l.setElapsedRealtimeNanos(nanos);if(Build.VERSION.SDK_INT>=26){l.setSpeedAccuracyMetersPerSecond(.25f);l.setBearingAccuracyDegrees(3f);l.setVerticalAccuracyMeters(5f);}locations.setTestProviderLocation(provider,l);}
-            sent++;last=new JSONObject().put("distance",engine.distance).put("elapsed",engine.elapsed).put("point",point).put("sent",sent).put("providers",new org.json.JSONArray(providers)).put("providerErrors",providerErrors).put("laps",(int)(engine.distance/engine.lap)).put("infinite",engine.loops==0).put("total",engine.loops==0?JSONObject.NULL:engine.total);
+            engine.advance(dt,Double.POSITIVE_INFINITY);sendPoint(now);
             if(engine.distance>=engine.total){stop("completed","");return;}
-            if(wake!=null)wake.acquire(15000);handler.postDelayed(this,1000);
+            if(wake!=null)wake.acquire(15000);handler.postDelayed(this.tick,500);
         }catch(Exception e){stop("error",message(e));}
-    }};
+    };
+    void sendPoint(long now) throws Exception {
+        JSONObject point=engine.point();long time=System.currentTimeMillis(),nanos=SystemClock.elapsedRealtimeNanos();
+        for(String provider:new ArrayList<>(providers)){
+            try{
+                Location l=new Location(provider);l.setLatitude(point.getDouble("lat"));l.setLongitude(point.getDouble("lon"));l.setAccuracy(5);l.setAltitude(0);
+                l.setSpeed((float)point.getDouble("speed"));l.setBearing((float)point.getDouble("bearing"));l.setTime(time);l.setElapsedRealtimeNanos(nanos);
+                l.setSpeedAccuracyMetersPerSecond(.25f);l.setBearingAccuracyDegrees(3f);l.setVerticalAccuracyMeters(5f);
+                // Some location consumers require this legacy GPS quality field.
+                // This is simulated metadata, not a measurement of real satellites.
+                if(LocationManager.GPS_PROVIDER.equals(provider)){
+                    Bundle quality=new Bundle();quality.putInt("satellites",12);l.setExtras(quality);
+                }
+                locations.setTestProviderLocation(provider,l);
+            }catch(Exception e){providerErrors.put(provider,message(e));providers.remove(provider);try{locations.removeTestProvider(provider);}catch(Exception ignored){}}
+        }
+        if(providers.isEmpty())throw new IllegalStateException("所有定位通道发送失败："+providerErrors);
+        JSONObject snapshot=new JSONObject().put("distance",engine.distance).put("elapsed",engine.elapsed).put("point",point).put("sent",++sent)
+            .put("providers",new org.json.JSONArray(providers)).put("providerErrors",new JSONObject(providerErrors.toString()))
+            .put("laps",(int)(engine.distance/engine.lap)).put("infinite",engine.loops==0).put("total",engine.loops==0?JSONObject.NULL:engine.total)
+            .put("wallElapsed",(now-started)/1000.0).put("received",received).put("receivedMovement",receivedMovement).put("fusedReceived",fusedReceived);
+        if(observed!=null){
+            double age=(SystemClock.elapsedRealtimeNanos()-observed.getElapsedRealtimeNanos())/1000000000.0;
+            snapshot.put("observedPoint",new JSONObject().put("lat",observed.getLatitude()).put("lon",observed.getLongitude())).put("observedAge",Math.max(0,age));
+        }
+        last=snapshot; // Publish a complete snapshot, without sharing mutable worker data.
+    }
+    void respond(ResultReceiver reply,boolean ok,String reason){
+        if(reply==null)return;Bundle data=new Bundle();data.putString("error",reason);
+        try{data.putString("status",status().toString());}catch(Exception ignored){}
+        reply.send(ok?1:0,data);
+    }
     static String message(Exception e){return e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();}
     void registerProvider(String provider){
-        try{locations.addTestProvider(provider,false,false,false,false,true,true,true,Criteria.POWER_LOW,provider.equals(LocationManager.GPS_PROVIDER)?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE);locations.setTestProviderEnabled(provider,true);providers.add(provider);}
-        catch(Exception first){
-            try{locations.removeTestProvider(provider);locations.addTestProvider(provider,false,false,false,false,true,true,true,Criteria.POWER_LOW,provider.equals(LocationManager.GPS_PROVIDER)?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE);locations.setTestProviderEnabled(provider,true);providers.add(provider);}
-            catch(Exception retry){try{providerErrors.put(provider,message(retry));}catch(Exception ignored){}}
+        LocationProvider original=locations.getProvider(provider);boolean gps="gps".equals(provider);
+        boolean network=original==null?!gps:original.requiresNetwork(),satellite=original==null?gps:original.requiresSatellite(),cell=original==null?!gps:original.requiresCell();
+        int power=original==null?(gps?Criteria.POWER_HIGH:Criteria.POWER_LOW):original.getPowerRequirement();
+        int accuracy=original==null?(gps?Criteria.ACCURACY_FINE:Criteria.ACCURACY_COARSE):original.getAccuracy();
+        for(int attempt=0;attempt<2;attempt++){
+            try{
+                locations.addTestProvider(provider,network,satellite,cell,false,true,true,true,power,accuracy);
+                if(!ownedProviders.contains(provider))ownedProviders.add(provider);
+                locations.setTestProviderEnabled(provider,true);
+                if(Build.VERSION.SDK_INT<29)locations.setTestProviderStatus(provider,LocationProvider.AVAILABLE,null,SystemClock.elapsedRealtime());
+                providers.add(provider);return;
+            }catch(Exception e){
+                try{locations.removeTestProvider(provider);}catch(Exception ignored){}
+                if(attempt==1)try{providerErrors.put(provider,message(e));}catch(Exception ignored){}
+            }
         }
     }
     void notifyRunning(){
-        NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("replay","轨迹回放",NotificationManager.IMPORTANCE_LOW));
+        NotificationManager nm=getSystemService(NotificationManager.class);nm.createNotificationChannel(new NotificationChannel("replay","跑步定位",NotificationManager.IMPORTANCE_LOW));
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MobileActivity.class),PendingIntent.FLAG_IMMUTABLE);
         PendingIntent stop=PendingIntent.getService(this,1,new Intent(this,ReplayService.class).putExtra("action","stop"),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
-        Notification n=new Notification.Builder(this,"replay").setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("校园路线 · 定位回放").setContentText("手机独立回放中；请按学校要求规划准确路线").setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null,"停止",stop).build()).build();
+        Notification n=new Notification.Builder(this,"replay").setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle("校园乐跑助手 · 跑步中")
+            .setContentText("可切换到乐跑查看位置；点击结束跑步可停止定位更新").setContentIntent(open).setOngoing(true)
+            .addAction(new Notification.Action.Builder(null,"结束跑步",stop).build()).build();
         startForeground(101,n);
     }
     void cleanup(){
-        handler.removeCallbacks(tick);if(wake!=null&&wake.isHeld())wake.release();
-        for(String provider:new ArrayList<>(providers)){try{locations.removeTestProvider(provider);}catch(Exception e){cleanupError=message(e);}}
-        providers.clear();
+        handler.removeCallbacks(tick);
+        try{locations.removeUpdates(observer);locations.removeUpdates(fusedObserver);}catch(Exception e){cleanupError=message(e);}
+        if(wake!=null&&wake.isHeld())wake.release();
+        for(String provider:new ArrayList<>(ownedProviders)){try{locations.removeTestProvider(provider);}catch(IllegalArgumentException absent){}catch(Exception e){cleanupError=message(e);}}
+        providers.clear();ownedProviders.clear();
     }
     void stop(String next,String reason){state=next;error=reason;cleanup();stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
     public static JSONObject status() throws Exception {return new JSONObject(last.toString()).put("state",state).put("error",error).put("cleanupError",cleanupError);}
     public static void command(String action,JSONObject data) throws Exception {
-        ReplayService s=instance;if(s==null||s.engine==null||!active())throw new IllegalStateException("当前没有正在回放的轨迹");
-        if(action.equals("pause")){s.engine.paused=true;state="paused";}
-        else if(action.equals("resume")){s.engine.paused=false;state="running";}
-        else if(action.equals("tune")){s.engine.motion=RouteEngine.validateMotion(data,s.engine.motion.optDouble("speed"));}
-        else if(action.equals("stop"))s.stop("idle","");
-        else throw new IllegalArgumentException("操作无效");
+        ReplayService s=instance;if(s==null||s.engine==null||!active())throw new IllegalStateException("当前没有正在进行的跑步");
+        CountDownLatch ready=new CountDownLatch(1);AtomicReference<Exception> failure=new AtomicReference<>();
+        s.handler.post(()->{try{
+            if(action.equals("pause")){s.engine.paused=true;state="paused";}
+            else if(action.equals("resume")){s.engine.paused=false;state="running";}
+            else if(action.equals("tune")){s.engine.motion=RouteEngine.validateMotion(data,s.engine.motion.optDouble("speed"));}
+            else if(action.equals("stop"))s.stop("idle","");
+            else throw new IllegalArgumentException("操作无效");
+        }catch(Exception e){failure.set(e);}finally{ready.countDown();}});
+        if(!ready.await(5,TimeUnit.SECONDS))throw new IllegalStateException("跑步操作超时");if(failure.get()!=null)throw failure.get();
     }
-    @Override public void onDestroy(){cleanup();if(instance==this)instance=null;if(state.equals("running")||state.equals("paused")){state="idle";error="服务已停止";}super.onDestroy();}
+    @Override public void onDestroy(){
+        handler.post(()->{cleanup();if(instance==null&&(state.equals("running")||state.equals("paused"))){state="idle";error="服务已停止";}});
+        worker.quitSafely();if(instance==this)instance=null;super.onDestroy();
+    }
     @Override public IBinder onBind(Intent i){return null;}
 }

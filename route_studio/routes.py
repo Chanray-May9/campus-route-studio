@@ -104,7 +104,7 @@ class Route:
         self.total_distance = math.inf if self.infinite else self.lap_distance * self.loops
         self.duration = self.total_distance / self.speed
         if not self.infinite and self.duration > 24 * 3600:
-            raise ValueError("单次回放时长不能超过 24 小时")
+            raise ValueError("单次跑步时长不能超过 24 小时")
 
     @classmethod
     def from_dict(cls, data):
@@ -136,7 +136,7 @@ def import_route(text, fmt):
                 raise ValueError("文件不是 GPX")
             segments = [node for node in root.iter() if node.tag.split("}")[-1] in ("trkseg", "rte")]
             if len(segments) > 1:
-                raise ValueError("一次只能导入一条连续轨迹；请先拆分多段 GPX")
+                raise ValueError("一次只能导入一条连续路线；请先拆分多段 GPX")
             values = [{"lat": n.get("lat"), "lon": n.get("lon")} for n in root.iter()
                       if n.tag.split("}")[-1] in ("trkpt", "rtept")]
         except ET.ParseError:

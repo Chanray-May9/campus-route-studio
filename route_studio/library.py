@@ -31,7 +31,7 @@ class RouteLibrary:
     def save(self, data):
         name = data.get('name')
         if not isinstance(name, str) or not name.strip() or len(name.strip()) > 80:
-            raise ValueError('轨迹名称需要 1–80 个字符')
+            raise ValueError('路线名称需要 1–80 个字符')
         raw = data.get('route')
         route = Route.from_dict(raw)
         motion = Motion(data.get('motion'), route.speed)
@@ -42,10 +42,10 @@ class RouteLibrary:
             with db:
                 if ident:
                     if not db.execute('SELECT 1 FROM routes WHERE id=?', (ident,)).fetchone():
-                        raise ValueError('要更新的轨迹不存在')
+                        raise ValueError('要更新的路线不存在')
                 else:
                     if db.execute('SELECT COUNT(*) FROM routes').fetchone()[0] >= 100:
-                        raise ValueError('最多保存 100 条轨迹，请先删除不需要的轨迹')
+                        raise ValueError('最多保存 100 条路线，请先删除不需要的路线')
                     ident = str(uuid.uuid4())
                 db.execute('INSERT INTO routes VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,updated=excluded.updated,payload=excluded.payload,distance=excluded.distance,points=excluded.points',
                            (ident, name.strip(), datetime.now(timezone.utc).isoformat(), payload, route.lap_distance, len(raw['points'])))
@@ -55,12 +55,12 @@ class RouteLibrary:
 
     def load(self, ident):
         if not isinstance(ident, str):
-            raise ValueError('请选择轨迹')
+            raise ValueError('请选择路线')
         db = self.connect()
         try:
             row = db.execute('SELECT id,name,payload FROM routes WHERE id=?', (ident,)).fetchone()
             if row is None:
-                raise ValueError('轨迹不存在')
+                raise ValueError('路线不存在')
             return {'id': row['id'], 'name': row['name'], **json.loads(row['payload'])}
         finally:
             db.close()
@@ -71,7 +71,7 @@ class RouteLibrary:
             with db:
                 result = db.execute('DELETE FROM routes WHERE id=?', (ident,))
                 if not result.rowcount:
-                    raise ValueError('轨迹不存在')
+                    raise ValueError('路线不存在')
             return {'deleted': True}
         finally:
             db.close()

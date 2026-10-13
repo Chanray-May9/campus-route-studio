@@ -6,7 +6,7 @@
   const fromMap = point => window.CampusCoords.gcjToWgs(point);
   const STORAGE_KEY = 'campus-route-studio:route:v1';
   const SCHOOL_KEY = 'campus-route-studio:school:v1';
-  // 自动保存的完整方案：路线 + 回放参数 + 变速参数 + 设备选项。
+  // 自动保存的完整方案：路线 + 跑步设置 + 变速参数 + 设备选项。
   // 自动保存参数用的键。名字保持 v2 不变，这样之前存下的参数升级后还能读到；
   // 记录内部的 version 字段才是真正的格式版本（v2 把参数放在 route 下，v3 放在 params 下）。
   const AUTO_KEY = 'campus-route-studio:settings:v2';
@@ -19,7 +19,7 @@
   async function refreshLibrary(selected = $('library-select').value) {
     const data = await api('/api/library');
     libraryEntries = data.entries || [];
-    $('library-select').replaceChildren(new Option('请选择已保存轨迹', ''));
+    $('library-select').replaceChildren(new Option('请选择已保存路线', ''));
     for (const entry of libraryEntries) $('library-select').append(new Option(`${entry.name} · ${entry.points} 点 · ${Math.round(entry.distance)} 米`, entry.id));
     if (libraryEntries.some(e => e.id === selected)) $('library-select').value = selected;
     libraryInfo();
@@ -28,7 +28,7 @@
 
   function libraryInfo() {
     const entry = libraryEntries.find(e => e.id === $('library-select').value);
-    $('library-info').textContent = entry ? `${entry.points} 个路径点 · ${Math.round(entry.distance)} 米 · 更新于 ${new Date(entry.updated).toLocaleString()}` : `共 ${libraryEntries.length} 条轨迹，保存到此电脑，重启后仍可读取。`;
+    $('library-info').textContent = entry ? `${entry.points} 个路径点 · ${Math.round(entry.distance)} 米 · 更新于 ${new Date(entry.updated).toLocaleString()}` : `共 ${libraryEntries.length} 条路线，保存到此电脑，重启后仍可读取。`;
   }
 
   async function libraryAction(work) {
@@ -36,13 +36,13 @@
     libraryBusy = true;
     updateControls();
     try { await work(); }
-    catch (error) { notify(`轨迹库：${error.message}`, true); }
+    catch (error) { notify(`路线库：${error.message}`, true); }
     finally { libraryBusy = false; updateControls(); }
   }
 
   function restoreLibrary(entry) {
     const restored = validatePoints(entry.route.points);
-    if (restored.length < 2) throw new Error('轨迹至少需要两个路径点。');
+    if (restored.length < 2) throw new Error('路线至少需要两个路径点。');
     const motion = entry.motion || {};
     points = restored;
     $('speed').value = entry.route.speed;
@@ -66,11 +66,11 @@
   $('library-save').addEventListener('click', () => libraryAction(async () => {
     const data = await api('/api/library/save', {name: $('library-name').value, route: settings(), motion: motionSettings()});
     await refreshLibrary(data.id);
-    notify(`“${data.name}”已保存到电脑轨迹库。`);
+    notify(`“${data.name}”已保存到电脑路线库。`);
   }));
   $('library-update').addEventListener('click', () => libraryAction(async () => {
     const id = $('library-select').value;
-    if (!id) throw new Error('请先选择要更新的轨迹。');
+    if (!id) throw new Error('请先选择要更新的路线。');
     const data = await api('/api/library/save', {id, name: $('library-name').value, route: settings(), motion: motionSettings()});
     await refreshLibrary(data.id);
     notify(`“${data.name}”已更新。`);
@@ -79,7 +79,7 @@
     if (editingLocked()) return;
     libraryAction(async () => {
       const data = await api('/api/library/load', {id: $('library-select').value});
-      if (editingLocked()) throw new Error('回放已开始，请先停止回放再载入。');
+      if (editingLocked()) throw new Error('跑步已开始，请先停止跑步再载入。');
       restoreLibrary(data);
     });
   });
@@ -93,13 +93,13 @@
     });
   });
   const ACTIVE_STATES = new Set(['starting', 'running', 'paused', 'stopping']);
-  const STATE_LABELS = {idle: '尚未开始', starting: '正在启动', running: '回放中', paused: '已暂停', stopping: '正在停止', completed: '回放完成', error: '回放异常'};
+  const STATE_LABELS = {idle: '尚未开始', starting: '正在启动', running: '跑步中', paused: '已暂停', stopping: '正在停止', completed: '跑步完成', error: '跑步异常'};
   const MODE_DESCRIPTIONS = {
     preview: '先预览路线与速度。预览模式不会向设备发送定位数据。',
-    android: '使用 ADB 连接 Android 真机或 MuMu，并通过定位助手回放。请先完成模拟位置应用设置。',
+    android: '使用 ADB 连接 Android 真机或 MuMu，并通过定位助手跑步。请先完成模拟位置应用设置。',
     mumu: '通过本机 MuMu 管理器发送定位。不需要定位助手，支持情况取决于管理器版本。',
-    ios: '通过 USB 与 iOS 开发者服务回放定位。需要匹配系统版本的开发环境，无法保证所有 iOS 版本可用。',
-    avd: '面向 Android Studio 官方模拟器。可用模拟器控制台同时回放定位与加速度数据。'
+    ios: '通过 USB 与 iOS 开发者服务跑步定位。需要匹配系统版本的开发环境，无法保证所有 iOS 版本可用。',
+    avd: '面向 Android Studio 官方模拟器。可用模拟器控制台同时模拟定位与运动传感器数据。'
   };
   const DEFAULT_POINTS = [{lat:29.51264659,lon:106.69253011},{lat:29.51204124,lon:106.69388141},{lat:29.51191977,lon:106.69394581},{lat:29.51175158,lon:106.69396727},{lat:29.51162077,lon:106.69392434},{lat:29.51150865,lon:106.69381701},{lat:29.51145258,lon:106.69364529},{lat:29.51148061,lon:106.69348430},{lat:29.51214402,lon:106.69223932},{lat:29.51222811,lon:106.69211053},{lat:29.51236827,lon:106.69209980},{lat:29.51254580,lon:106.69212126},{lat:29.51264858,lon:106.69217493},{lat:29.51264659,lon:106.69253011}];
   let points = DEFAULT_POINTS.map(point => ({...point}));
@@ -148,7 +148,7 @@
 
   function setFollow(value) {
     followPlayback = Boolean(value);
-    $('follow-button').textContent = `跟随回放：${followPlayback ? '开' : '关'}`;
+    $('follow-button').textContent = `跟随位置：${followPlayback ? '开' : '关'}`;
     $('follow-button').setAttribute('aria-pressed', String(followPlayback));
   }
 
@@ -160,7 +160,7 @@
     return {
       version: 3,
       savedAt: new Date().toISOString(),
-      // 只自动保存回放参数，不保存轨迹点：轨迹由「保存到本机」和轨迹库负责。
+      // 只自动保存跑步设置，不保存路线点：路线由「保存到本机」和路线库负责。
       params: {
         speed,
         loops: infinite ? 0 : fieldInteger('loops', 1, 10000, 1),
@@ -236,7 +236,7 @@
   function applySavedSettings(saved) {
     if (!saved || typeof saved !== 'object' || (saved.version !== 2 && saved.version !== 3)) return false;
     let restored = false;
-    // v2 把参数放在 route 下，v3 放在 params 下；两者的轨迹点都一律忽略，绝不覆盖当前路线。
+    // v2 把参数放在 route 下，v3 放在 params 下；两者的路线点都一律忽略，绝不覆盖当前路线。
     const params = (saved.version === 3 ? saved.params : saved.route) || {};
     if (typeof params === 'object') {
       const speed = validNumber(params.speed, 0.2, 20);
@@ -359,7 +359,7 @@
     $('quit-button').disabled = true;
     try {
       await api('/api/quit', {});
-      document.body.replaceChildren(Object.assign(document.createElement('p'), {textContent: '工作台正在停止回放并退出。可以关闭此页面。'}));
+      document.body.replaceChildren(Object.assign(document.createElement('p'), {textContent: '校园乐跑助手正在结束跑步并退出。可以关闭此页面。'}));
     } catch (error) {
       $('quit-button').disabled = false;
       notify(error.message, true);
@@ -454,7 +454,7 @@
     const loops = $('loop-mode').value === 'infinite' ? 0 : Number($('loops').value);
     if (!Number.isFinite(speed) || speed < 0.2 || speed > 20) throw new Error('速度应为 0.2 到 20 m/s。');
     if (!Number.isInteger(loops) || loops < 0 || loops > 10000 || (loops === 0 && $('loop-mode').value !== 'infinite')) throw new Error('指定圈数应为 1 到 10000 的整数。');
-    if (requireRoute && (points.length < 2 || routeDistance() < 1)) throw new Error('请至少添加两个不同的途经点，路线长度须大于 1 米。');
+    if (requireRoute && (points.length < 2 || routeDistance() < 1)) throw new Error('请至少添加两个不同的路线点，路线长度须大于 1 米。');
     return {points: validatePoints(points), speed, loops, interval: 1};
   }
 
@@ -487,7 +487,7 @@
     markerLayer.clearLayers();
     points.forEach((point, index) => {
       const display = toMap(point);
-      const marker = L.marker([display.lat, display.lon], {icon: markerIcon(index, points.length), draggable: !editingLocked(), title: `途经点 ${index + 1}：拖动调整坐标`, keyboard: true}).addTo(markerLayer);
+      const marker = L.marker([display.lat, display.lon], {icon: markerIcon(index, points.length), draggable: !editingLocked(), title: `路线点 ${index + 1}：拖动调整坐标`, keyboard: true}).addTo(markerLayer);
       marker.on('dragend', (event) => {
         if (editingLocked()) { drawRoute(); return; }
         const position = fromMap({lat: event.target.getLatLng().lat, lon: event.target.getLatLng().lng});
@@ -526,7 +526,7 @@
       info.className = 'waypoint-info';
       const title = document.createElement('span');
       title.className = 'waypoint-title';
-      title.textContent = index === 0 ? '起点' : index === points.length - 1 ? '终点' : `途经点 ${index + 1}`;
+      title.textContent = index === 0 ? '起点' : index === points.length - 1 ? '终点' : `路线点 ${index + 1}`;
       const coordinates = document.createElement('span');
       coordinates.className = 'waypoint-coordinates';
       coordinates.textContent = `${point.lat.toFixed(5)}, ${point.lon.toFixed(5)}`;
@@ -536,7 +536,7 @@
       remove.className = 'waypoint-remove';
       remove.textContent = '×';
       remove.disabled = editingLocked();
-      remove.setAttribute('aria-label', `删除途经点 ${index + 1}`);
+      remove.setAttribute('aria-label', `删除路线点 ${index + 1}`);
       remove.addEventListener('click', () => {
         if (editingLocked()) return;
         points.splice(index, 1);
@@ -576,15 +576,7 @@
     const school = savedSchool();
     $('school-button').disabled = !school;
     if (school) { const p = toMap(school); map.setView([p.lat, p.lon], Math.max(1, Math.min(19, school.zoom || 16))); }
-    const tiles = L.tileLayer('https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {maxZoom: 19, attribution: '&copy; 高德地图'}).addTo(map);
-    let failed = 0;
-    let succeeded = 0;
-    tiles.on('loading', () => { failed = 0; succeeded = 0; });
-    tiles.on('tileerror', () => { failed++; if (failed >= 3 && !succeeded) $('map-offline').hidden = false; });
-    tiles.on('tileload', () => { succeeded++; });
-    tiles.on('load', () => { $('map-offline').hidden = !(failed > succeeded || !navigator.onLine); });
-    window.addEventListener('offline', () => { $('map-offline').hidden = false; });
-    window.addEventListener('online', () => { tiles.redraw(); });
+    CampusBasemap.attach(map, {onFallback: message => notify(message), onUnavailable: value => { $('map-offline').hidden = !value; }});
     routeLayer = L.polyline([], {color: '#0d746b', weight: 4, opacity: 0.88, lineJoin: 'round', lineCap: 'round'}).addTo(map);
     markerLayer = L.layerGroup().addTo(map);
     map.on('click', (event) => addPoint(fromMap({lat: event.latlng.lat, lon: event.latlng.lng})));
@@ -595,7 +587,7 @@
     const active = isActive();
     const locked = editingLocked();
     $('loop-mode').disabled = locked;
-    $('loop-hint').textContent = $('loop-mode').value === 'infinite' ? '路线自动闭合，持续回放直到点击停止；不会因完成一圈而退出。' : '回放指定圈数后自动停止。';
+    $('loop-hint').textContent = $('loop-mode').value === 'infinite' ? '路线自动闭合，持续跑步直到点击停止；不会因完成一圈而退出。' : '跑完指定圈数后自动停止。';
     const librarySelected = Boolean($('library-select').value);
     $('library-refresh').disabled = libraryBusy;
     $('library-save').disabled = libraryBusy || busy || points.length < 2;
@@ -616,12 +608,12 @@
     $('connect-button').disabled = locked || deviceBusy;
     document.querySelectorAll('.refresh-button').forEach(button => { button.disabled = locked || deviceBusy; button.textContent = deviceBusy ? '查找中…' : '刷新'; });
     $('start-button').disabled = busy || active || points.length < 2 || !serverOnline;
-    $('start-button').querySelector('span').textContent = busy && !active ? '正在处理…' : $('mode').value === 'preview' ? '开始预览' : '开始设备回放';
+    $('start-button').querySelector('span').textContent = busy && !active ? '正在处理…' : $('mode').value === 'preview' ? '开始预览' : '开始跑步';
     $('pause-button').disabled = busy || !['running', 'paused'].includes(run.state);
     $('pause-button').textContent = run.state === 'paused' ? '继续' : '暂停';
     $('stop-button').disabled = busy || !['starting', 'running', 'paused'].includes(run.state);
     $('map-mode-label').textContent = active ? '路线已锁定' : '路线编辑';
-    $('map-tip').lastChild.textContent = active ? '路线回放中 · 停止后可继续编辑' : '点击地图添加途经点 · 拖动标记调整位置';
+    $('map-tip').lastChild.textContent = active ? '路线跑步中 · 停止后可继续编辑' : '点击地图添加路线点 · 拖动标记调整位置';
     if (markerLayer) markerLayer.eachLayer(marker => {
       if (!marker.dragging) return;
       if (locked) marker.dragging.disable(); else marker.dragging.enable();
@@ -658,13 +650,13 @@
     $('ios-motion-note').hidden = $('mode').value !== 'ios';
     const sent = Number.isFinite(run.sentUpdates) ? run.sentUpdates : null;
     const age = run.lastSendTime ? Math.max(0, (Date.now() / 1000) - run.lastSendTime) : null;
-    $('send-diagnostics').textContent = run.state === 'idle' ? '开始回放后显示坐标发送状态。' : sent === null ? '当前后台尚未支持发送诊断，请停止回放后重新启动 start.cmd。' : `已发送 ${sent} 次坐标${age === null ? ' · 等待首次发送' : ` · 上次发送 ${Math.floor(age)} 秒前 · 耗时 ${run.lastSendMs || 0} 毫秒`}。接口发送成功不等于手机地图已确认更新。`;
+    $('send-diagnostics').textContent = run.state === 'idle' ? '开始跑步后显示坐标发送状态。' : sent === null ? '当前后台尚未支持发送诊断，请停止跑步后重新启动 start.cmd。' : `已发送 ${sent} 次坐标${age === null ? ' · 等待首次发送' : ` · 上次发送 ${Math.floor(age)} 秒前 · 耗时 ${run.lastSendMs || 0} 毫秒`}。接口发送成功不等于手机地图已确认更新。`;
     if (run.point && Number.isFinite(run.point.lat) && Number.isFinite(run.point.lon)) {
       $('current-position').textContent = `${run.point.lat.toFixed(7)}, ${run.point.lon.toFixed(7)}`;
       if (map) {
         const display = toMap(run.point);
         const position = [display.lat, display.lon];
-        if (!playbackMarker) playbackMarker = L.marker(position, {icon: L.divIcon({className: 'route-map-marker current-marker', iconSize: [23, 23], iconAnchor: [11.5, 11.5]}), zIndexOffset: 1000, interactive: false, title: '当前回放位置'}).addTo(map);
+        if (!playbackMarker) playbackMarker = L.marker(position, {icon: L.divIcon({className: 'route-map-marker current-marker', iconSize: [23, 23], iconAnchor: [11.5, 11.5]}), zIndexOffset: 1000, interactive: false, title: '当前跑步位置'}).addTo(map);
         else playbackMarker.setLatLng(position);
         if (followPlayback) map.setView(position, Math.max(18, map.getZoom()), {animate: false});
       }
@@ -672,9 +664,9 @@
       $('current-position').textContent = '—';
       if (map && playbackMarker) { map.removeLayer(playbackMarker); playbackMarker = null; }
     }
-    if (run.error && run.error !== lastRunError) { lastRunError = run.error; notify(`回放失败：${run.error}`, true); }
+    if (run.error && run.error !== lastRunError) { lastRunError = run.error; notify(`启动跑步失败：${run.error}`, true); }
     if (run.cleanupError && run.cleanupError !== lastCleanupError) { lastCleanupError = run.cleanupError; notify(`停止后的设备清理未完成：${run.cleanupError}\n请在设备上检查定位是否恢复。`, true); }
-    if (previousState !== 'completed' && run.state === 'completed' && !run.cleanupError) notify('路线回放已完成。设备模式下，请在设备上核对定位恢复情况。');
+    if (previousState !== 'completed' && run.state === 'completed' && !run.cleanupError) notify('本次跑步已完成。设备模式下，请在设备上核对定位恢复情况。');
     updateControls();
   }
 
@@ -692,7 +684,7 @@
         serverOnline = false;
         $('server-status').textContent = '本机服务连接中断';
         $('connection-dot').classList.remove('connected');
-        if (isActive()) notify(`${error.message}\n界面无法确认设备端是否仍在回放。`, true);
+        if (isActive()) notify(`${error.message}\n界面无法确认设备端是否仍在跑步。`, true);
         updateControls();
       } finally { statusPromise = null; }
     })();
@@ -794,6 +786,17 @@
   $('speed').addEventListener('input', updateEstimates);
   $('loops').addEventListener('input', updateEstimates);
   $('loop-mode').addEventListener('change', () => { updateEstimates(); updateControls(); });
+  $('detect-mumu').addEventListener('click',()=>action(async()=>{
+    const found=await api('/api/mumu');const choices=[];
+    for(const manager of found.managers)for(const instance of manager.instances)if(instance.running)choices.push({manager:manager.path,...instance});
+    const select=$('mumu-instances');select.replaceChildren(new Option('请选择已启动实例',''));
+    choices.forEach((item,index)=>select.append(new Option(item.name+'（实例 '+item.index+'）',String(index))));
+    const choose=()=>{const item=choices[Number(select.value)];if(select.value===''||!item)return;$('manager').value=item.manager;$('instance').value=item.index;saveNow();};
+    select.onchange=choose;
+    if(choices.length===1){select.value='0';choose();notify('已找到 MuMu 实例；开始跑步前请确认选择。');}
+    else if(choices.length>1){$('instance').value='';notify('找到多个已启动实例，请选择要跑步的一个。');}
+    else notify(found.errors.join('；')||'未找到已启动的 MuMu。请先启动实例，或手动填写路径。',true);
+  }));
   $('mode').addEventListener('change', modeChanged);
   $('android-device').addEventListener('change', updateControls);
   document.querySelectorAll('.refresh-button').forEach(button => button.addEventListener('click', refreshDevices));
@@ -808,7 +811,7 @@
     if (!serial) throw new Error('请先选择一台已授权的 Android 设备。');
     notify('正在安装定位助手并打开设备设置…');
     const data = await api('/api/android/setup', {serial}, 120000);
-    notify(data.message || '定位助手已安装。请在设备开发者选项中，将本项目助手选为“模拟位置信息应用”，然后开始回放。');
+    notify(data.message || '定位助手已安装。请在设备开发者选项中，将本项目助手选为“模拟位置信息应用”，然后开始跑步。');
   }));
   $('connect-button').addEventListener('click', () => action(async () => {
     const address = $('adb-address').value.trim();
@@ -833,22 +836,22 @@
       payload.manager = $('manager').value.trim();
       payload.instance = Number($('instance').value);
       if (!payload.manager) throw new Error('请输入本机 MuMuManager.exe 的完整路径。');
-      if (!Number.isInteger(payload.instance) || payload.instance < 0 || payload.instance > 9999) throw new Error('MuMu 实例编号应为 0 到 9999 的整数。');
+      if (!$('instance').value.trim() || !Number.isInteger(payload.instance) || payload.instance < 0 || payload.instance > 999) throw new Error('请先选择实例，编号应为 0 到 999 的整数。');
     }
     lastRunError = '';
     lastCleanupError = '';
-    notify(mode === 'preview' ? '正在启动路线预览…' : '正在初始化设备回放，请稍候…');
+    notify(mode === 'preview' ? '正在启动路线预览…' : '正在初始化设备跑步，请稍候…');
     await api('/api/start', payload, 120000);
     if (statusPromise) await statusPromise;
     await refreshStatus();
-    if (['running', 'starting'].includes(run.state)) notify(mode === 'preview' ? '路线预览已启动。橙色标记显示服务返回的当前位置。' : '设备回放已启动，请在设备端核对实际定位效果。');
+    if (['running', 'starting'].includes(run.state)) notify(mode === 'preview' ? '路线预览已启动。橙色标记显示服务返回的当前位置。' : '设备跑步已启动，请在设备端核对实际定位效果。');
   }));
   $('pause-button').addEventListener('click', () => action(async () => {
     const command = run.state === 'paused' ? 'resume' : 'pause';
     await api('/api/control', {action: command});
     if (statusPromise) await statusPromise;
     await refreshStatus();
-    notify(command === 'pause' ? '回放已暂停。' : '回放已继续。');
+    notify(command === 'pause' ? '跑步已暂停。' : '跑步已继续。');
   }));
   $('stop-button').addEventListener('click', () => action(async () => {
     await api('/api/control', {action: 'stop'}, 60000);
@@ -879,12 +882,12 @@
     downloadText(data.filename, data.text, data.mime);
     notify('路线文件已生成，浏览器将保存下载文件。');
   }));
-  // 「保存到本机」/「读取上次方案」维持原样：显式保存和恢复整条轨迹。
+  // 「保存到本机」/「读取上次方案」维持原样：显式保存和恢复整条路线。
   $('save-button').addEventListener('click', () => {
     try {
       const route = settings(false);
       localStorage.setItem(STORAGE_KEY, JSON.stringify({version: 1, savedAt: new Date().toISOString(), route}));
-      notify('当前路线与回放参数已保存在此浏览器，可通过“读取上次方案”恢复。');
+      notify('当前路线与跑步设置已保存在此浏览器，可通过“读取上次方案”恢复。');
     } catch (error) { notify(`保存失败：${error.message}`, true); }
   });
   $('load-button').addEventListener('click', () => {
@@ -897,25 +900,25 @@
       const restored = validatePoints(saved.route.points);
       const speed = Number(saved.route.speed);
       const loops = Number(saved.route.loops);
-      if (!Number.isFinite(speed) || speed < 0.2 || speed > 20 || !Number.isInteger(loops) || loops < 0 || loops > 10000) throw new Error('保存的回放参数无效。');
+      if (!Number.isFinite(speed) || speed < 0.2 || speed > 20 || !Number.isInteger(loops) || loops < 0 || loops > 10000) throw new Error('保存的跑步设置无效。');
       points = restored;
       $('speed').value = speed;
       $('loop-mode').value = loops === 0 ? 'infinite' : 'finite';
       $('loops').value = loops || 1;
       changeCount++;
       renderRoute(true);
-      notify('已恢复上次保存的路线与回放参数。');
+      notify('已恢复上次保存的路线与跑步设置。');
     } catch (error) { notify(error.message, true); }
   });
   $('reset-settings-button').addEventListener('click', () => {
-    if (!window.confirm('恢复默认回放参数？当前路线会保留。')) return;
+    if (!window.confirm('恢复默认跑步设置？当前路线会保留。')) return;
     Object.entries(DEFAULT_SETTINGS).forEach(([id, value]) => { $(id).value = value; });
     setFollow(false);
     $('sensor').checked = false;
     updateEstimates();
     updateControls();
     saveNow();
-    notify('回放参数已恢复默认值。');
+    notify('跑步设置已恢复默认值。');
   });
   $('help-button').addEventListener('click', () => $('help-dialog').showModal());
   $('close-help-button').addEventListener('click', () => $('help-dialog').close());

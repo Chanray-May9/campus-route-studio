@@ -57,7 +57,11 @@ class Application:
         if path == '/api/library':
             return {'entries': self.library.list()}
         if path == "/api/status":
-            return {"run": self.playback.status(), "info": {"name": "Campus Route Studio", "version": __version__}}
+            return {"run": self.playback.status(), "info": {"name": "校园乐跑助手", "version": __version__}}
+        if path == "/api/mumu":
+            from .mumu import discover_mumu
+            with self.device_lock:
+                return discover_mumu()
         if path == "/api/devices":
             # Serialise device discovery against setup and other discovery requests.
             if not self.device_lock.acquire(blocking=False):
@@ -91,7 +95,7 @@ class Application:
         if path in ("/api/connect", "/api/android/setup"):
             with self.device_lock:
                 if self.playback.status()["state"] in Playback.ACTIVE:
-                    raise ValueError("请先停止回放再配置设备")
+                    raise ValueError("请先停止跑步再配置设备")
                 if path == "/api/connect":
                     return connect_android(data.get("address"))
                 return install_android_helper(data.get("serial"))
@@ -135,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://webrd01.is.autonavi.com; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://webrd01.is.autonavi.com https://webst01.is.autonavi.com; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'")
 
     def json_response(self, status, data):
         payload = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
@@ -206,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(length))
             path = urlsplit(self.path).path
             if path == "/api/quit":
-                self.json_response(200, {"message": "正在停止回放并退出程序"})
+                self.json_response(200, {"message": "正在停止跑步并退出程序"})
                 threading.Thread(target=self.server.finish, daemon=True).start()
             else:
                 self.json_response(200, self.server.application.post(path, data))
@@ -229,7 +233,7 @@ def main():
     url = server.origin + "/?token=" + server.token
     print("Campus Route Studio " + __version__, flush=True)
     print("本地界面：" + url, flush=True)
-    print("停止回放后使用界面退出按钮或 Ctrl+C 退出。关闭浏览器标签页不会退出后台。", flush=True)
+    print("停止跑步后使用界面退出按钮或 Ctrl+C 退出。关闭浏览器标签页不会退出后台。", flush=True)
     if not args.no_browser:
         webbrowser.open(url)
     try:
