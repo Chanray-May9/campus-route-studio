@@ -1,7 +1,7 @@
 """Build a standalone Windows x64 package and per-user Inno Setup installer.
 
 Build prerequisites only: Python 3.12 x64, PyInstaller, requirements-ios.txt,
-Android platform-tools, both APKs and Inno Setup 6. End users need none of these.
+Android platform-tools, the direct DEX JAR and Inno Setup 6. End users need none of these.
 """
 import argparse
 import os
@@ -27,10 +27,10 @@ def main():
     from route_studio import __version__
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    tools = args.sdk / 'platform-tools'
-    helper = ROOT / 'build/campus-route-helper.apk'
-    if not helper.is_file() or not (tools / 'adb.exe').is_file():
-        raise RuntimeError('Build the helper APK and install Android platform-tools first.')
+    tools = args.sdk.resolve() / 'platform-tools'
+    bridge = ROOT / 'build/campus-route-direct.jar'
+    if not bridge.is_file() or not (tools / 'adb.exe').is_file():
+        raise RuntimeError('Build the direct DEX JAR with scripts/build_android_bridge.py and install Android platform-tools first.')
     if not args.skip_freeze:
         subprocess.run([
             sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean',
@@ -38,7 +38,7 @@ def main():
             '--paths', str(ROOT), '--distpath', str(output),
             '--workpath', str(ROOT / 'build/windows'), '--specpath', str(ROOT / 'build'),
             '--add-data', f'{ROOT / "route_studio/web"};route_studio/web',
-            '--add-data', f'{helper};.',
+            '--add-data', f'{bridge};.',
             '--add-data', f'{ROOT / "examples"};examples',
             '--add-data', f'{tools};platform-tools',
             '--collect-all', 'pymobiledevice3', '--collect-all', 'developer_disk_image',
@@ -51,7 +51,7 @@ def main():
     # the exact package directory layout, including when repackaging a runtime.
     tunnel_source = Path(importlib.util.find_spec('pytun_pmd3').origin).parent
     shutil.copytree(tunnel_source / 'wintun/bin', package / '_internal/pytun_pmd3/wintun/bin', dirs_exist_ok=True)
-    for name in ('LICENSE', 'README.md', 'MOBILE_SETUP.md', 'VALIDATION.md', 'ANDROID_FIX_NOTES.md', 'THIRD_PARTY_NOTICES.md'):
+    for name in ('LICENSE', 'README.md', 'MOBILE_SETUP.md', 'VALIDATION.md', 'COMPATIBILITY_VALIDATION.md', 'BACKGROUND_OPERATION.md', 'WINDOWS_DIRECT.md', 'DIRECT_RUNTIME_VALIDATION.md', 'PIP_COMPATIBILITY.md', 'ANDROID_FIX_NOTES.md', 'THIRD_PARTY_NOTICES.md'):
         shutil.copy2(ROOT / name, package / name)
     shutil.copytree(ROOT / 'docs/images', package / 'docs/images', dirs_exist_ok=True)
     licenses = package / '_internal/licenses'

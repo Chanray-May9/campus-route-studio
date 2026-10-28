@@ -32,6 +32,7 @@ public final class MockLocationService extends Service {
     public static final long WATCHDOG_MS = 10_000;
     private static final String[] PROVIDERS = {LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER};
     private static MockLocationService instance;
+    static String startupError = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
     private LocationManager locations;
     private PowerManager.WakeLock wakeLock;
@@ -60,6 +61,7 @@ public final class MockLocationService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         ResultReceiver reply = intent == null ? null : intent.getParcelableExtra("reply");
         String error = null;
+        startupError = "";
         try {
             verifySetup();
             showNotification();
@@ -76,7 +78,8 @@ public final class MockLocationService extends Service {
             handler.postDelayed(watchdog, 1000);
         } catch (Exception exception) {
             error = CommandReceiver.message(exception)
-                + "; select this mock-location app, grant location permission, and open the helper before starting.";
+                + "；请先在手机中完成定位权限和模拟位置设置。";
+            startupError = error;
             try { cleanup(); } catch (Exception ignored) { }
             stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
@@ -90,17 +93,16 @@ public final class MockLocationService extends Service {
     }
 
     private void verifySetup() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-            && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            throw new SecurityException("Location permission is required for the foreground service");
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            throw new SecurityException("请授予校园乐跑定位助手精确位置权限");
         }
         AppOpsManager appOps = getSystemService(AppOpsManager.class);
         if (appOps.checkOpNoThrow(AppOpsManager.OPSTR_MOCK_LOCATION, Process.myUid(), getPackageName())
             != AppOpsManager.MODE_ALLOWED) {
-            throw new SecurityException("Select 校园乐跑定位助手 as the mock-location app in Developer options");
+            throw new SecurityException("请在开发者选项选择校园乐跑定位助手为模拟位置应用；电脑模式不能选择手机独立版校园乐跑助手");
         }
         if (Build.VERSION.SDK_INT >= 28 && !locations.isLocationEnabled()) {
-            throw new IllegalStateException("Enable the device Location setting");
+            throw new IllegalStateException("请打开手机系统定位开关");
         }
     }
 
@@ -229,11 +231,6 @@ public final class MockLocationService extends Service {
             if (service != null) service.stopForeground(STOP_FOREGROUND_REMOVE);
             context.stopService(new Intent(context, MockLocationService.class));
         }
-    }
-
-    @Override public void onTaskRemoved(Intent rootIntent) {
-        try { stopSession(this); } catch (Exception ignored) { }
-        super.onTaskRemoved(rootIntent);
     }
 
     @Override public void onDestroy() {

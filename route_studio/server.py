@@ -17,7 +17,7 @@ import webbrowser
 from urllib.parse import parse_qs, urlsplit
 
 from . import __version__
-from .adapters import adb_path, connect_android, install_android_helper, list_android_devices
+from .adapters import adb_path, connect_android, probe_android_direct, list_android_devices
 from .playback import Playback
 from .routes import export_route, import_route
 from .library import RouteLibrary
@@ -92,13 +92,13 @@ class Application:
             return import_route(data.get("text"), data.get("format"))
         if path == "/api/export":
             return export_route(data)
-        if path in ("/api/connect", "/api/android/setup"):
+        if path in ("/api/connect", "/api/android/probe"):
             with self.device_lock:
                 if self.playback.status()["state"] in Playback.ACTIVE:
                     raise ValueError("请先停止跑步再配置设备")
                 if path == "/api/connect":
                     return connect_android(data.get("address"))
-                return install_android_helper(data.get("serial"))
+                return probe_android_direct(data.get("serial"))
         raise LookupError("接口不存在")
 
 

@@ -17,6 +17,7 @@ public final class CommandReceiver extends BroadcastReceiver {
             JSONObject value = new JSONObject();
             value.put("ok", ok);
             value.put("running", MockLocationService.isRunning());
+            value.put("startupError", MockLocationService.startupError);
             if (error != null) value.put("error", error);
             return value.toString();
         } catch (Exception impossible) {

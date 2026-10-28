@@ -110,66 +110,11 @@ class PreviewAdapter:
         pass
 
 
-class AndroidAdapter:
-    PACKAGE = "org.campusroute.helper"
-
-    def __init__(self, serial):
-        self.serial = serial_value(serial)
-        self.adb = adb_path()
-        self.started = False
-
-    def broadcast(self, action, point=None):
-        args = [self.adb, "-s", self.serial, "shell", "am", "broadcast", "--include-stopped-packages",
-                "-n", self.PACKAGE + "/.CommandReceiver", "--es", "action", action]
-        for name, value in (point or {}).items():
-            if name in ("lat", "lon", "speed", "bearing", "accuracy"):
-                args.extend(["--es", name, f"{float(value):.8f}"])
-        output = command(args)
-        # am prints resultData as an outer quoted string, without reliably escaping its JSON.
-        match = re.search(r'data="(\{.*\})"', output)
-        if not match:
-            raise DeviceError("助手没有返回有效结果。请先安装并在手机中配置助手。" + output[-700:])
-        try:
-            result = json.loads(match.group(1))
-        except ValueError:
-            raise DeviceError("无法读取 Android 助手响应：" + output[-700:]) from None
-        if not result.get("ok"):
-            raise DeviceError(result.get("error", "Android 助手操作失败"))
-        return result
-
-    def open(self):
-        state = command([self.adb, "-s", self.serial, "get-state"])
-        if state.strip() != "device":
-            raise DeviceError("设备尚未授权或离线")
-        installed = command([self.adb, "-s", self.serial, "shell", "pm", "path", self.PACKAGE])
-        if "package:" not in installed:
-            raise DeviceError("请先点击“安装 / 配置 Android 助手”，并在手机中完成定位权限与模拟位置设置")
-        # Mark before start so cleanup also runs if the response is lost.
-        self.started = True
-        self.broadcast("start")
-
-    def send(self, point):
-        self.broadcast("update", {**point, "accuracy": 5})
-
-    def close(self):
-        if self.started:
-            self.broadcast("stop")
-            self.started = False
+from .android_direct import AndroidDirectAdapter as AndroidAdapter
 
 
-def install_android_helper(serial):
-    serial = serial_value(serial)
-    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
-    candidates = [base / "build" / "campus-route-helper.apk", base / "campus-route-helper.apk"]
-    apk = next((p for p in candidates if p.is_file()), None)
-    if apk is None:
-        raise DeviceError("找不到 Android 助手 APK。请下载完整 Windows 发行包或运行 python scripts/build_android.py。")
-    adb = adb_path()
-    output = command([adb, "-s", serial, "install", "-r", str(apk)], timeout=120)
-    if "Success" not in output:
-        raise DeviceError(output)
-    command([adb, "-s", serial, "shell", "am", "start", "-n", AndroidAdapter.PACKAGE + "/.MainActivity"])
-    return {"message": "助手已安装并打开。请按手机上的引导授予权限，并将“校园路线助手”选为模拟位置信息应用。"}
+def probe_android_direct(serial):
+    return AndroidAdapter(serial).probe()
 
 
 class MuMuAdapter:

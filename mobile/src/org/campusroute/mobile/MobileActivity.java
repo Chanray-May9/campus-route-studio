@@ -47,6 +47,11 @@ public final class MobileActivity extends Activity {
         try{result.put("developerEnabled",Settings.Global.getInt(getContentResolver(),Settings.Global.DEVELOPMENT_SETTINGS_ENABLED,0)!=0);}catch(Exception ignored){result.put("developerEnabled",JSONObject.NULL);}
         result.put("mockSelected",getSystemService(android.app.AppOpsManager.class).checkOpNoThrow(android.app.AppOpsManager.OPSTR_MOCK_LOCATION,android.os.Process.myUid(),getPackageName())==android.app.AppOpsManager.MODE_ALLOWED);
         result.put("finePermission",checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED);
+        result.put("backgroundPermission",Build.VERSION.SDK_INT<29||checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)==PackageManager.PERMISSION_GRANTED);
+        result.put("batteryExempt",getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(getPackageName()));
+        result.put("backgroundRestricted",Build.VERSION.SDK_INT>=28&&getSystemService(android.app.ActivityManager.class).isBackgroundRestricted());
+        result.put("notificationsEnabled",getSystemService(android.app.NotificationManager.class).areNotificationsEnabled());
+        result.put("restartEnabled",ReplayService.recoveryEnabled(this));
         LocationManager manager=getSystemService(LocationManager.class);
         result.put("locationEnabled",Build.VERSION.SDK_INT>=28?manager.isLocationEnabled():manager.isProviderEnabled("gps")||manager.isProviderEnabled("network"));
         return result;
@@ -89,6 +94,21 @@ public final class MobileActivity extends Activity {
                     case "pause":case "resume":case "stop":case "tune":ReplayService.command(action,data);result=ReplayService.status();break;
                     case "permissions":result=onMain(()->{java.util.ArrayList<String> p=new java.util.ArrayList<>();p.add(Manifest.permission.ACCESS_FINE_LOCATION);p.add(Manifest.permission.ACCESS_COARSE_LOCATION);if(Build.VERSION.SDK_INT>=33)p.add(Manifest.permission.POST_NOTIFICATIONS);requestPermissions(p.toArray(new String[0]),10);return new JSONObject();});break;
                     case "developerSettings":result=onMain(()->developerSettings());break;
+                    case "restartPreference":
+                        if(ReplayService.active())throw new IllegalStateException("请先结束当前运行，再调整系统回收后恢复设置");
+                        if(!store.prefs.edit().putBoolean("restart_enabled",data.getBoolean("enabled")).commit())throw new IllegalStateException("后台恢复设置保存失败");
+                        if(!data.getBoolean("enabled")&&!getSharedPreferences("run_session",MODE_PRIVATE).edit().remove("checkpoint").commit())throw new IllegalStateException("运行恢复点清除失败");
+                        break;
+                    case "backgroundSettings":result=onMain(()->{
+                        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)throw new IllegalStateException("请先授予精确位置权限，再设置后台位置权限");
+                        if(Build.VERSION.SDK_INT==29)requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},11);
+                        else startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));
+                        return new JSONObject();});break;
+                    case "batterySettings":result=onMain(()->{
+                        if(getSystemService(PowerManager.class).isIgnoringBatteryOptimizations(getPackageName()))return new JSONObject().put("alreadyGranted",true);
+                        try{startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,Uri.parse("package:"+getPackageName())));}
+                        catch(ActivityNotFoundException|SecurityException e){startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName())));}
+                        return new JSONObject();});break;
                     case "aboutPhone":result=onMain(()->new JSONObject().put("action",openSettings(Settings.ACTION_DEVICE_INFO_SETTINGS,Settings.ACTION_SETTINGS)));break;
                     case "location":result=onMain(()->{
                         if(ReplayService.active())throw new IllegalStateException("正在模拟定位，停止后再获取手机实际位置");

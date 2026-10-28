@@ -21,9 +21,11 @@ import java.util.ArrayList;
 
 public final class MainActivity extends Activity {
     private TextView status;
+    private boolean prepare;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        acceptIntent(getIntent());
         int pad = (int) (24 * getResources().getDisplayMetrics().density);
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
@@ -41,6 +43,8 @@ public final class MainActivity extends Activity {
         column.addView(button("打开开发者选项", view -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)));
         column.addView(button("应用权限设置", view -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.parse("package:" + getPackageName())))));
+        column.addView(button("后台电池设置", view -> openSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)));
+        column.addView(text("电脑连接时会自动打开本页面并启动服务。请授予精确位置；手机独立版与本连接器不能同时作为模拟位置应用。若切换后停止，请解除本应用的后台和电池限制。", 14));
         column.addView(text("后台启动可能需要在应用权限中允许“始终访问位置”。也可保持此页面可见并手动启动。本工具不会自动修改模拟位置应用授权。", 14));
         column.addView(button("启动跑步定位服务", view -> startReplay()));
         column.addView(button("停止并移除模拟位置", view -> {
@@ -61,6 +65,19 @@ public final class MainActivity extends Activity {
     @Override public void onResume() {
         super.onResume();
         if (status != null) status.setText(MockLocationService.isRunning() ? "跑步服务运行中" : "服务未运行");
+        if (prepare) { prepare = false; startReplay(); }
+    }
+
+    private void acceptIntent(Intent intent) {
+        if (intent != null && "prepare".equals(intent.getStringExtra("action"))) {
+            MockLocationService.startupError = "";
+            prepare = true;
+            intent.removeExtra("action");
+        }
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); acceptIntent(intent);
     }
 
     private TextView text(String value, int size) {
@@ -104,6 +121,9 @@ public final class MainActivity extends Activity {
                 }
             };
             startForegroundService(new Intent(this, MockLocationService.class).putExtra("reply", reply));
-        } catch (Exception error) { status.setText(CommandReceiver.message(error)); }
+        } catch (Exception error) {
+            MockLocationService.startupError = CommandReceiver.message(error);
+            status.setText(MockLocationService.startupError);
+        }
     }
 }

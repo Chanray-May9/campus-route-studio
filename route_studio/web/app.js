@@ -96,7 +96,7 @@
   const STATE_LABELS = {idle: '尚未开始', starting: '正在启动', running: '跑步中', paused: '已暂停', stopping: '正在停止', completed: '跑步完成', error: '跑步异常'};
   const MODE_DESCRIPTIONS = {
     preview: '先预览路线与速度。预览模式不会向设备发送定位数据。',
-    android: '使用 ADB 连接 Android 真机或 MuMu，并通过定位助手跑步。请先完成模拟位置应用设置。',
+    android: '通过 USB 调试直接连接 Android，手机不安装 APK。开始时验证系统定位通道，结束时移除临时定位。',
     mumu: '通过本机 MuMu 管理器发送定位。不需要定位助手，支持情况取决于管理器版本。',
     ios: '通过 USB 与 iOS 开发者服务跑步定位。需要匹配系统版本的开发环境，无法保证所有 iOS 版本可用。',
     avd: '面向 Android Studio 官方模拟器。可用模拟器控制台同时模拟定位与运动传感器数据。'
@@ -809,9 +809,9 @@
   $('setup-button').addEventListener('click', () => action(async () => {
     const serial = $('android-device').value;
     if (!serial) throw new Error('请先选择一台已授权的 Android 设备。');
-    notify('正在安装定位助手并打开设备设置…');
-    const data = await api('/api/android/setup', {serial}, 120000);
-    notify(data.message || '定位助手已安装。请在设备开发者选项中，将本项目助手选为“模拟位置信息应用”，然后开始跑步。');
+    notify('正在检测安卓直连能力，手机不安装 APK…');
+    const data = await api('/api/android/probe', {serial}, 120000);
+    notify(data.message || '安卓直连基础检测通过。请开启手机定位，开始后核对实际位置。');
   }));
   $('connect-button').addEventListener('click', () => action(async () => {
     const address = $('adb-address').value.trim();

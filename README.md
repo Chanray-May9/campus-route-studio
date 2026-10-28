@@ -1,27 +1,32 @@
 # 校园乐跑助手
 
+> 当前测试版：Windows 0.6.4 安卓免安装 APK 直连，手机独立版 0.6.3。Windows 已通过 Android 15 模拟器运行验收；安卓实体手机与 iOS 尚未验收。见 [运行验收报告](DIRECT_RUNTIME_VALIDATION.md)。
+> Windows 安卓模式已移除手机 APK 依赖，使用 ADB 临时进程；运行时仍有临时文件与进程。详见 [WINDOWS_DIRECT.md](WINDOWS_DIRECT.md)。
+> 手机 0.6.3 移除小窗，增加电池优化豁免申请和系统回收后的近期进度恢复；见 [BACKGROUND_OPERATION.md](BACKGROUND_OPERATION.md)。无法保证厂商不结束后台或所有目标软件都持续接收。
+> 0.6.0 的历史测试结果不代表此版本或所有厂商手机已通过。见 [COMPATIBILITY_VALIDATION.md](COMPATIBILITY_VALIDATION.md)。
+
 在高德地图上选择校园跑步路线，设置距离、配速和圈数，再开始跑步定位。
 提供 Windows 安装版和 Android 版。地图默认使用**高德卫星影像 + 高德道路标注**，
 可切换为高德普通地图；卫星瓦片不可用时自动回退。
 
-**[下载最新版本](https://github.com/Chanray-May9/campus-route-studio/releases/latest)** ·
+**[下载当前测试版](https://github.com/Chanray-May9/campus-route-studio/releases/tag/v0.6.4)** ·
 [下载页](https://chanray-may9.github.io/campus-route-studio/)
 
 ## Windows：安装后直接使用
 
-1. 下载 `CampusRouteStudio-Windows-Setup-0.6.0.exe`，按中文向导安装。
+1. 下载 `CampusRouteStudio-Windows-Setup-0.6.4-direct-test.exe`，按中文向导安装。
 2. 打开桌面或开始菜单里的“校园乐跑助手”，浏览器自动打开本机界面。
 3. 选择校园路线，设置速度和圈数。先使用“仅在地图预览”检查路线。
 4. 通过 USB 连接手机，在界面选择对应设备并完成首次连接设置。
    点击“开始跑步”，在乐跑里确认位置持续变化后再开始记录。
 5. 结束时点击“结束并退出”。关闭浏览器标签页不会退出本机程序。
 
-安装包内置 Python、ADB、Android 定位助手和 iOS 连接依赖，**不需要安装 Python、
+安装包内置 Python、ADB、安卓临时直连组件和 iOS 连接依赖，**不需要安装 Python、
 JDK 或 Android SDK，也不需要配置 PATH**。支持 Windows 10/11 x64，按当前用户安装，
 不要求管理员权限。系统“已安装的应用”中可以卸载；保存的路线留在当前用户的本地数据目录。
 
-也提供免安装 `CampusRouteStudio-Windows.zip`，解压后打开 `CampusRouteStudio.exe`。
-此 ZIP 同样包含运行环境。源代码请下载 `CampusRoute-Source.zip`。
+也提供免安装 `CampusRouteStudio-Windows-0.6.4-direct-test.zip`，解压后打开 `CampusRouteStudio.exe`。
+此 ZIP 同样包含运行环境。源代码请下载 `CampusRoute-Source-0.6.4.zip`。
 
 ![Windows 界面](docs/images/windows-workflow.png)
 
@@ -35,19 +40,19 @@ JDK 或 Android SDK，也不需要配置 PATH**。支持 Windows 10/11 x64，按
 本次调整了后台工作线程、启动确认、时间戳、前台服务和有超时保护的唤醒锁，保留系统原生融合定位，
 并展示系统实际回调和移动距离。详细设置见 [MOBILE_SETUP.md](MOBILE_SETUP.md)。
 
-本次修复 GPS 数据缺少传统卫星数量元数据导致目标应用不采用后续坐标的问题。
+历史 0.6.0 修复了 GPS 数据缺少传统卫星数量元数据导致目标应用不采用后续坐标的问题。
 使用**手机 APK 自身的 GPS/network 定位链路**进行测试，
 步道乐跑 4.2.6 自由跑里程持续增加，暂停、继续和熄屏运行通过；正式 APK 也单独验证通过。
 安卓版在手机内计算路线并持续发送坐标，没有电脑定位桥依赖。
 真实手机尚未实测，不能把单一设备验证当成所有手机或所有目标应用都兼容。
-详细数据见 [VALIDATION.md](VALIDATION.md)。
+历史数据见 [VALIDATION.md](VALIDATION.md)。手机独立版 0.6.3 的后台恢复尚未完成设备验收，详见 [BACKGROUND_OPERATION.md](BACKGROUND_OPERATION.md)。
 
 ![Android 界面（测试设备）](docs/images/android-workflow.png)
 
 ## Windows 连接其他设备
 
-- Android USB：开启 USB 调试、确认电脑授权，安装内置“校园乐跑定位助手”，按手机引导
-  授予权限并选择模拟位置应用。目标软件是否采用模拟位置需在设备上核对。
+- Android USB：开启 USB 调试、确认电脑授权，使用电脑的“检测安卓直连”；不安装手机 APK。
+  开始时验证系统定位权限与通道，运行中使用 ADB 临时定位进程。系统限制与实际目标软件接收需在设备上核对。
 - iPhone USB：需要 Apple 设备驱动、解锁并信任电脑，以及系统要求的开发者模式和服务。
   安装包已内置 Python 连接库，但 Apple 驱动和手机系统设置仍需完成。此次未测试真实 iPhone。
 - Android 官方模拟器：支持模拟器定位，提供可选运动传感器模拟。
@@ -85,6 +90,7 @@ node tests/test_basemap.cjs
 node tests/test_mobile_ui.cjs  # 需要 Playwright
 python scripts/build_android.py --source-dir mobile --apk-name CampusRoute-Mobile.apk
 python scripts/build_android.py
+python scripts/build_android_bridge.py
 python -m pip install pyinstaller==6.20.0 -r requirements-ios.txt
 python scripts/build_windows.py --iscc "C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
 python scripts/package_release.py --output dist/release --android-build build --windows-build dist

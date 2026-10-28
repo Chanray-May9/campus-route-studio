@@ -1,3 +1,3 @@
 """Campus Route Studio: a local route editor and device location replay tool."""
 
-__version__ = "0.6.0"
+__version__ = "0.6.4"

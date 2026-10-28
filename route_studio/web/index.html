@@ -83,13 +83,13 @@
       <aside class="panel device-panel" aria-labelledby="device-title">
         <div class="panel-heading"><div><span class="eyebrow">02 / RUN</span><h2 id="device-title">连接设备与跑步</h2></div><span class="connection-dot" id="connection-dot" aria-hidden="true"></span></div>
         <label class="field-label" for="mode">连接方式</label>
-        <select id="mode"><option value="preview">仅在地图预览</option><option value="android">Android / MuMu（ADB）</option><option value="mumu">MuMu（管理器定位）</option><option value="ios">iPhone / iPad（USB）</option><option value="avd">Android 官方模拟器（AVD）</option></select>
+        <select id="mode"><option value="preview">仅在地图预览</option><option value="android">Android（USB 直连，免安装 APK）</option><option value="mumu">MuMu（管理器定位）</option><option value="ios">iPhone / iPad（USB）</option><option value="avd">Android 官方模拟器（AVD）</option></select>
         <p class="mode-description" id="mode-description">先预览路线与速度。预览模式不会向设备发送定位数据。</p>
 
         <div id="android-fields" class="device-fields" hidden>
           <div class="section-label"><label for="android-device">ADB 设备</label><button class="text-button refresh-button" type="button">刷新</button></div>
           <select id="android-device"><option value="">请刷新并选择设备</option></select>
-          <div id="android-helper"><button class="secondary-button full-width" id="setup-button">安装定位助手并打开设置</button><p class="field-hint">需在设备开发者选项中，将本项目助手选为“模拟位置信息应用”。</p></div>
+          <div id="android-helper"><button class="secondary-button full-width" id="setup-button">检测安卓直连</button><p class="field-hint">开启 USB 调试并授权电脑，手机无需安装 APK。运行时会传入临时定位文件，结束时清理；系统限制以检测结果为准。</p></div>
           <details id="adb-connect"><summary>连接 MuMu ADB</summary><label>ADB 地址<input id="adb-address" type="text" value="127.0.0.1:16384" placeholder="127.0.0.1:16384" spellcheck="false"></label><button class="secondary-button full-width" id="connect-button">连接此地址</button><p class="field-hint">端口以 MuMu 实例设置为准；不同版本与实例可能不同。</p></details>
         </div>
         <div id="ios-fields" class="device-fields" hidden>

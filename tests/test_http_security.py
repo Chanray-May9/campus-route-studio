@@ -46,6 +46,15 @@ class HTTPTests(unittest.TestCase):
         self.assertEqual(self.request('GET', '/../README.md')[0], 404)
         self.assertEqual(self.request('POST', '/api/start', '{')[0], 400)
 
+    def test_android_probe_is_authenticated_and_never_calls_install_endpoint(self):
+        self.assertEqual(self.request('POST', '/api/android/probe', '{"serial":"phone"}', auth=False)[0], 403)
+        with patch('route_studio.server.probe_android_direct', return_value={'probe': True, 'message': 'no APK'}) as probe:
+            status, body = self.request('POST', '/api/android/probe', '{"serial":"phone"}')
+            self.assertEqual(status, 200)
+            self.assertTrue(json.loads(body)['probe'])
+            probe.assert_called_once_with('phone')
+        self.assertEqual(self.request('POST', '/api/android/setup', '{"serial":"phone"}')[0], 404)
+
     def test_preview_and_local_only(self):
         with self.assertRaises(ValueError):
             LocalServer(('0.0.0.0', 0))
